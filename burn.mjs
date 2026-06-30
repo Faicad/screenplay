@@ -2,7 +2,7 @@ import { readFileSync } from 'fs'
 import { pathToFileURL, fileURLToPath } from 'url'
 import { dirname, join, basename, extname } from 'path'
 import { spawnSync } from 'child_process'
-import { burnVideo, screenplayDir } from './lib-electron.mjs'
+import { burnVideo, screenplayDir } from './lib-common.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 

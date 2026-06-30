@@ -1,5 +1,5 @@
 // Verify: magnifier → clickWithHighlight (circle + cursor) → cleanup
-import * as lib from '../lib.mjs'
+import * as lib from '../lib_3d_viewer_electron.mjs'
 
 lib.makeMovie(
   import.meta.url,

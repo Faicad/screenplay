@@ -1,7 +1,7 @@
 import { readFileSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
-import * as lib from '../lib.mjs'
+import * as lib from '../lib_3d_viewer_electron.mjs'
 
 
 const subtitle = `

@@ -1,5 +1,5 @@
 // Smoke test for lib-electron.mjs — just import and print exports
-import * as lib from '../lib-electron.mjs'
+import * as lib from '../lib_3d_viewer_electron.mjs'
 
 console.log('lib-electron exports:')
 for (const [key, value] of Object.entries(lib)) {

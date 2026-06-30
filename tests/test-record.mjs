@@ -1,5 +1,5 @@
 // Minimal recording test for lib-electron.mjs
-import * as lib from '../lib-electron.mjs'
+import * as lib from '../lib_3d_viewer_electron.mjs'
 
 const subtitle = `这是 Electron 录制测试。`
 

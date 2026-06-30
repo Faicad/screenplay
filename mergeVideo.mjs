@@ -2,7 +2,7 @@ import { existsSync, readFileSync, statSync, readdirSync, rmSync, renameSync, wr
 import { join, dirname, basename, extname, relative, resolve } from 'path'
 import { pathToFileURL } from 'url'
 import { spawn, spawnSync } from 'child_process'
-import { DEFAULT_BGM, screenplayDir } from './lib-electron.mjs'
+import { DEFAULT_BGM, screenplayDir } from './lib-common.mjs'
 import { makeCoverClip } from './coverClip.mjs'
 
 /**

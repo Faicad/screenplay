@@ -3,7 +3,7 @@ import { resolve, dirname, basename, extname, join } from 'path'
 import { spawnSync } from 'child_process'
 import { pathToFileURL } from 'url'
 import { chromium } from 'playwright'
-import * as lib from './lib.mjs'
+import * as lib from './lib-common.mjs'
 import { generateSubtitle, parseSubtitleLines, INITIAL_GAP, INTER_LINE_GAP, DEFAULT_TTS_PROVIDER } from './generate-subtitle.mjs'
 import { buildHtmlComposition, isMarkType, pad4 } from './html-composer.mjs'
 

@@ -1,7 +1,7 @@
 import { readFileSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
-import * as lib from '../lib.mjs'
+import * as lib from '../lib_3d_viewer_electron.mjs'
 
 // Windows自带3D查看器即将停用！替代神器来了
 

@@ -12,7 +12,7 @@ import { createServer } from 'http'
 import { readFileSync, existsSync, statSync } from 'fs'
 import { join, extname, dirname } from 'path'
 import { fileURLToPath } from 'url'
-import * as lib from '../lib.mjs'
+import * as lib from '../lib_3d_viewer_electron.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 // Use lib.rootDir / lib.distDir from the Electron host config (.env: 3D_VIEWER_ELECTRON_ROOT)

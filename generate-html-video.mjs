@@ -3,7 +3,7 @@ import { resolve, dirname, basename, extname, join } from 'path'
 import { spawnSync } from 'child_process'
 import { pathToFileURL, fileURLToPath } from 'url'
 import { chromium } from 'playwright'
-import * as lib from './lib.mjs'
+import * as lib from './lib-common.mjs'
 import { generateSubtitle, parseSubtitleLines, INITIAL_GAP, INTER_LINE_GAP, DEFAULT_TTS_PROVIDER } from './generate-subtitle.mjs'
 
 // ── Helpers (reused from generate-image-video.mjs) ──
