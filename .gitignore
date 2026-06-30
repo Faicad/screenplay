@@ -14,6 +14,6 @@ screenshot/*
 pretrained_models/*
 p*/*.stl
 p*/*.3mf
-p*/
 exported.stl
 __pycache__
+node_modules
