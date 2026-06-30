@@ -1,193 +1,201 @@
-# screenplay 与 electron 项目位置解耦方案
+# screenplay 与宿主项目位置解耦方案
 
 ## 需求
 
-`screenplay` 项目已从 `3d_viewer_electron/movies/` 移动到 `3d_viewer_electron/../screenplay/`（平级位置）。当前代码仍然假定 screenplay 是 electron 项目的子目录，需要解除这种位置依赖。
+`screenplay` 项目已从 `3d_viewer_electron/movies/` 移动为独立项目，位于 `3d_viewer_electron/../screenplay/`。目前代码仍假定 screenplay 是 electron 项目的子目录，需要解除这种位置依赖。
 
 ## 目的
 
-- screenplay 不再硬编码 electron 项目的文件路径
-- 未来可以对接 `3d_viewer_web`、`ficad_web` 等其他宿主项目
-- 实际录制脚本（`e1/`、`e2/` 等）尽量不改动
-- electron 项目位置信息只在一处配置
+- screenplay 不再硬编码任何宿主项目的文件路径
+- 同时支持 `3d_viewer_electron`（Electron 桌面端）和 `3d_viewer_web`（Web 端）两个宿主项目
+- 未来可扩展支持 `ficad_web` 等更多宿主
+- `3d_viewer_web/movies/p*/` 下的录制脚本拷贝到 screenplay 后只需改一行 import 即可运行
+- 现有 electron 录制脚本（`e1/`、`e2/` 等）尽量不改动
+- 每个宿主项目的位置信息只在 screenplay 的 `.env` 文件中配置一次
 
-## 现状：耦合点分析
+## 现状分析
 
-### 耦合点 1：`lib-electron.mjs` 的 4 个导出
+### 当前耦合点
 
-文件顶层用 `__dirname` 推导出 3 个变量，它们全部假定 screenplay 位于 electron 项目内部：
+`lib-electron.mjs` 文件顶部用 `__dirname` 推导了 3 个变量，全部假定 screenplay 是 electron 项目的子目录：
 
-| 导出 | 当前值 | 实际含义 |
-|------|--------|---------|
-| `rootDir` | `join(screenplayDir, '..')` | electron 项目根目录 |
+| 导出 | 当前定义 | 实际语义 |
+|------|---------|---------|
+| `rootDir` | `join(__dirname, '..')` | electron 项目根目录 |
 | `distDir` | `join(rootDir, 'dist')` | electron 打包输出目录 |
 | `fixtureDir` | `join(rootDir, 'src/test/fixtures')` | electron 测试模型目录 |
 
-以及 `getElectronExePath()` 函数用 `rootDir` 拼接 electron 可执行文件路径。
+另有 `getElectronExePath()` 函数依赖 `rootDir` 拼接 exe 路径。
 
-### 耦合点 2：录制脚本引用 `lib.rootDir`
+### 外部使用情况
 
-仅有 `e2/m1.mjs` 使用了 `lib.rootDir`，用于拼接 3D 模型文件的绝对路径：
+- `e2/m1.mjs`：2 处使用 `lib.rootDir` 拼接模型绝对路径（MODELS 数组混用了 screenplay 内部路径和 electron fixtures 路径）
+- `tests/test-unloadModel.mjs`：自行定义了 `rootDir = join(__dirname, '..', '..')` 和 `distDir`
+- 其余所有 `.mjs` 文件不引用 `rootDir` / `fixtureDir` / `distDir`
 
-- `join(lib.rootDir, 'movies/13+pro+max.stl')` — 实际在 screenplay 内，但通过 rootDir 间接引用
-- `join(lib.rootDir, 'src/test/fixtures/vise.3mf')` — 在 electron 项目的 fixtures 里
+### 两个宿主项目的 lib.mjs 差异
 
-MODELS 数组里的路径混用了两种来源：
-- `movies/xx.glb` → 文件在 screenplay 自身目录下
-- `src/test/fixtures/xx.3mf` → 文件在 electron 项目的 test fixtures 下
+| | electron 版 (`lib-electron.mjs`) | web 版 (`lib.mjs`) |
+|---|---|---|
+| Playwright 导入 | `_electron as electron` | `chromium` |
+| 启动方式 | `electron.launch()` 启动打包 exe | `chromium.launch()` 启动浏览器，goto URL |
+| 模型加载 | `page.evaluate(executeCommand('loadFile'))` | `page.goto(url + params)` 或 postMessage |
+| 等待模型就绪 | 轮询 `__modelStore.__loadingPhase` | 等待 DOM 事件或 `__modelLoaded` 标志 |
+| 视口调整 | `BrowserWindow.setContentSize()` | `page.setViewportSize()` |
+| 静态服务 | 不需要（Electron 自带 file:// 协议） | 需要起静态服务器提供 viewer + 模型 |
+| **其余所有函数** | （rotateModel, overlay, syncpoint, renderVideo, buildAss, burnVideo 等） | **完全相同** |
 
-### 耦合点 3：`tests/test-unloadModel.mjs`
-
-自己定义了 `rootDir = join(__dirname, '..', '..')`，同样假设 electron 项目是其祖父目录。
-
-### 耦合点 4：`lib.mjs`
-
-是 `lib-electron.mjs` 的纯转发：`export * from './lib-electron.mjs'`。录制脚本 import 的是 `lib.mjs`。
+两个版本约 80% 的代码是相同的。
 
 ## 技术方案
 
-### 核心原则
-
-**对 electron 项目的位置依赖只配置在一个地方** —— screenplay 项目根目录的 `.env` 文件。
-
-`lib-electron.mjs` 启动时从 `.env` 读取 `HOST_ROOT`（宿主项目根目录），推导出 `rootDir`、`fixtureDir`、`distDir`。录制脚本不感知这个变化——它们继续 `import * as lib from '../lib.mjs'`，继续使用 `lib.rootDir` 等导出。
-
-### 架构图
+### 总体架构
 
 ```
 screenplay/
-├── .env                        ← ★ 唯一配置点：HOST_ROOT=../3d_viewer_electron
-├── lib.mjs                     ← 不变，仍是转发
-├── lib-electron.mjs             ← 改：从 .env 读取 HOST_ROOT 来推导 rootDir 等
-├── env.mjs                     ← 已有，负责加载 .env
-├── e2/m1.mjs                   ← 不变
-├── tests/test-unloadModel.mjs  ← 改：删除自己推导的 rootDir，改用 lib.rootDir
+├── .env                              ← ★ 唯一配置点
+├── lib.mjs                           ← 不变：export * from './lib-electron.mjs'
+├── lib-common.mjs                    ← 新增：两版共用的通用函数
+├── lib-electron.mjs                  ← 改：读取 3D_VIEWER_ELECTRON_ROOT
+├── lib-web.mjs                       ← 新增：读取 3D_VIEWER_WEB_ROOT
+├── env.mjs                           ← 不变
+├── e1/ e2/ e3/                       ← 录制脚本，基本不改
 └── ...（其余文件全部不改）
 ```
 
-### 配置格式
+### 配置设计（`.env`）
 
-`screenplay/.env` 新增一行：
-
-```
-HOST_ROOT=../3d_viewer_electron
-```
-
-- 支持相对路径（相对于 screenplay 目录）和绝对路径
-- `env.mjs` 已有的 `.env` 加载机制无需修改，直接复用
-- `HOST_ROOT` 的含义：宿主项目（即 electron 项目）的根目录
-
-### `lib-electron.mjs` 改动范围
-
-只改文件开头的 4 行变量定义和 `getElectronExePath` 函数，其余 ~2040 行完全不动。
-
-**改动前**（硬编码推导）：
+`screenplay/.env` 中新增以下条目：
 
 ```
-export const moviesDir = __dirname
-export const rootDir = join(__dirname, '..')            // ← 假定父目录是 electron
-export const distDir = join(rootDir, 'dist')            // ← 派生自 rootDir
-export const fixtureDir = join(rootDir, 'src', 'test', 'fixtures') // ← 派生自 rootDir
+# ── 宿主项目根目录配置 ──
+
+# Electron 桌面端项目位置（相对路径相对于 screenplay 目录）
+3D_VIEWER_ELECTRON_ROOT=../3d_viewer_electron
+
+# Web 端项目位置
+3D_VIEWER_WEB_ROOT=../3d_viewer_web
+
+# Electron 可执行文件路径（覆盖默认推导）
+# ELECTRON_EXE=C:/path/to/3D_Viewer.exe
 ```
 
-**改动后**（从配置读取，提供默认值做 fallback）：
+配置原则：
+- 每个宿主项目一个 `*_ROOT` 变量，名称自描述，一目了然
+- 相对路径相对于 screenplay 项目根目录解析
+- 也支持绝对路径
+- `ELECTRON_EXE` 保持现有 env var 命名，不受影响
+- `env.mjs` 已有的 `.env` 加载机制直接复用，无需修改
+
+### 各文件的职责和改动
+
+#### `lib-common.mjs`（新增）
+
+从 `lib-electron.mjs` 中提取出与宿主无关的通用函数。包含：
+
+- `SIZE_PRESETS`、`resolveSizePreset()`、`resolveOrientationFilter()`、`resolve30fps()`、`resolveTtsProvider()`
+- `resolveOrientParam()`、`resolveOrientParams()`
+- `rotateModel()`、`translateModel()`、`moveModelToScreenNdc()`、`fitCameraToHeatbed()`
+- `animateCamera()`
+- `syncpoint()`
+- `zoomUI()`
+- `showOverlay()`、`hideOverlay()`、`clearOverlays()`
+- `clickById()`、`clickWithHighlight()`、`animateCursorClick()`
+- `magnifyToolbar()`、`removeMagnifyToolbar()`
+- `interceptProtocolWithDialog()`
+- `postMessage()`、`postMessageAndWait()`
+- `dispatchEvent()`、`callDemo()`
+- `captureCover()`、`screenshot()`
+- `setSelectValue()`、`setEnv()`、`hdrUrl()`
+- `renderVideo()`、`buildAss()`、`toAssTime()`、`buildKaraokeAssText()`、`burnVideo()`
+- `MODEL_PORT`、`DEFAULT_BGM`
+- `createStaticServer()`、`MIME_MAP`
+
+这些函数不依赖任何宿主项目的路径或启动方式，纯 Playwright + FFmpeg + Node.js 内置模块。
+
+#### `lib-electron.mjs`（改动）
+
+只改顶部变量定义区域和 `getElectronExePath()`，其余不动：
+
+- 删除 `rootDir`、`distDir`、`fixtureDir` 的硬编码推导
+- 新增 `resolveElectronRoot()` 函数：读取 `3D_VIEWER_ELECTRON_ROOT`，如果是相对路径则相对于 screenplay 目录（`__dirname`）解析为绝对路径；如果未设置则 fallback 到 `join(__dirname, '..')`（向后兼容）
+- `rootDir`、`distDir`、`fixtureDir` 改用 `resolveElectronRoot()` 推导，表达式不变
+- `getElectronExePath()`：优先 `ELECTRON_EXE` env var，否则用 `resolveElectronRoot()` + 约定路径
+- 从 `lib-common.mjs` re-export 所有通用函数
+- `moviesDir` 保持不变（指向 screenplay 自身，这是正确的）
+
+#### `lib-web.mjs`（新增）
+
+Web 宿主项目的适配器，与 `lib-electron.mjs` 结构平行：
+
+- 从 `lib-common.mjs` re-export 所有通用函数
+- 自己实现 `makeMovie()`、`recordOne()`、`loadModel()`、`waitForModel()`、`startRecording()`（用 `chromium` 而非 `_electron`）
+- 新增 `resolveWebRoot()` 函数：读取 `3D_VIEWER_WEB_ROOT`，解析逻辑同 electron 版
+- 导出 `rootDir`、`distDir`、`fixtureDir`（面向 web 项目的目录结构）
+- Web 版 `makeMovie` 通过 `chromium.launch()` 启动浏览器，用 URL 参数加载模型和配置
+
+#### `lib.mjs`（不改）
+
+保持 `export * from './lib-electron.mjs'`，向后兼容现有 electron 录制脚本。
+
+#### `env.mjs`（不改）
+
+已有 `.env` 加载逻辑完全适用。`3D_VIEWER_ELECTRON_ROOT` 等新变量会被自动加载进 `process.env`。
+
+#### `tests/test-unloadModel.mjs`（改动）
+
+删除自行定义的 `rootDir` 和 `distDir`，改为使用 `lib.rootDir` 和 `lib.distDir`。改动约 3 行。
+
+### 录制脚本兼容性
+
+**electron 录制脚本**（`e1/`、`e2/` 现有脚本）：完全不动。继续 `import * as lib from '../lib.mjs'`，继续使用 `lib.rootDir` 等。
+
+**web 录制脚本**（从 `3d_viewer_web/movies/p*/` 拷贝过来）：只改 import 行：
 
 ```
-export const moviesDir = __dirname                        // 不变，screenplay 自身目录
-export const rootDir = resolveHostRoot()                   // 从 HOST_ROOT 推导
-export const distDir = join(rootDir, 'dist')              // 表达式不变
-export const fixtureDir = join(rootDir, 'src', 'test', 'fixtures') // 表达式不变
+- import * as lib from '../lib.mjs'
++ import * as lib from '../lib-web.mjs'
 ```
 
-`resolveHostRoot()` 逻辑：
+其余代码不变。`makeMovie()` 的签名和 pageFn 的编写方式在 electron 和 web 版之间保持一致，因此录制脚本的业务逻辑无需任何改动。
 
-1. 读 `process.env.HOST_ROOT`
-2. 如果是相对路径 → 相对于 screenplay 目录（`__dirname`）解析为绝对路径
-3. 如果是绝对路径 → 直接使用
-4. 如果未设置 → **保持向后兼容**，fallback 到 `join(__dirname, '..')`（当前行为）
+### 路径解析逻辑
 
-`getElectronExePath()` 改动：
+`lib-electron.mjs` 中的 `resolveElectronRoot()` 和 `lib-web.mjs` 中的 `resolveWebRoot()` 采用相同的解析规则：
 
-1. 优先用 `process.env.ELECTRON_EXE`
-2. fallback 用 `HOST_ROOT` + 项目约定的相对路径 `dist/win-unpacked/3D_Viewer.exe`
-3. 不再硬编码 `rootDir`
+1. 读取对应的 env var（如 `3D_VIEWER_ELECTRON_ROOT`）
+2. 若值为相对路径 → 相对于 screenplay 项目目录（各自文件中的 `__dirname`）解析为绝对路径
+3. 若值为绝对路径 → 直接使用
+4. 若未设置 → 回退到 `join(__dirname, '..')`（保持向后兼容）
+5. `rootDir` 导出为解析后的绝对路径
+6. `distDir` = `join(rootDir, 'dist')`
+7. `fixtureDir` = `join(rootDir, 'src/test/fixtures')`
 
-### 为什么这样设计
+### 为什么这是"一个配置点"
 
-**1. 录制脚本不用改**
+所有对宿主项目的路径依赖，归纳起来只需要知道"宿主项目的根目录在哪"这一个信息。`distDir`、`fixtureDir`、exe 路径都由此派生。
 
-`e2/m1.mjs` 里的 `lib.rootDir` 继续可用。只要 `.env` 中配置了 `HOST_ROOT` 指向 electron 项目，所有路径拼接结果和以前完全一致。
+- electron 项目：配 `3D_VIEWER_ELECTRON_ROOT`
+- web 项目：配 `3D_VIEWER_WEB_ROOT`
+- 未来 `ficad_web`：配 `FICAD_WEB_ROOT`
 
-**2. 只有一个配置点**
+每个宿主只需一行配置。哪个录制脚本用哪个宿主，由其 import 的 lib 决定（`lib-electron.mjs` vs `lib-web.mjs`），而不由全局配置决定——只有这样才能同时支持多个宿主。
 
-所有对 electron 项目的路径依赖，归根结底只需要知道"electron 项目的根目录在哪里"。这个信息放进 `HOST_ROOT` 一个变量里。`distDir`、`fixtureDir`、exe 路径全部由此推导。
+### 文件改动汇总
 
-**3. `env.mjs` 的加载机制是现成的**
+| 文件 | 操作 | 改动量 |
+|------|------|--------|
+| `.env` | 新增 2 行配置 | +2 行 |
+| `lib-common.mjs` | **新建**，从 `lib-electron.mjs` 搬通用函数 | ~1600 行（搬家，不写新逻辑） |
+| `lib-electron.mjs` | 删掉通用函数（搬走），改顶部变量定义 | 删 ~1600 行，改 ~10 行 |
+| `lib-web.mjs` | **新建**，实现 web 版 `makeMovie` 等 | ~400 行新代码 |
+| `lib.mjs` | 不改 | 0 行 |
+| `tests/test-unloadModel.mjs` | `rootDir`/`distDir` 改用 lib 导出 | ~3 行 |
+| 所有其他文件 | 不改 | 0 行 |
 
-`env.mjs` 已经在 `lib-electron.mjs` 被 import 之前被各处加载（`generate-subtitle.mjs`、`pregen-tts.mjs` 等都用它）。只需让 `lib-electron.mjs` 顶部也调用一次 `loadDotEnv`，或直接读 `process.env.HOST_ROOT`。
+### Web 项目录制脚本迁移步骤（未来参考）
 
-**4. screenplay 自身目录（`moviesDir`/`screenplayDir`）不变**
-
-`__dirname` 在任何位置都是正确的——它指向 screenplay 项目根目录。`DEFAULT_BGM`、`saveExportedModel` 等使用的资源路径不受影响。
-
-### `tests/test-unloadModel.mjs` 改动
-
-删除文件内自己定义的 `rootDir` 和 `distDir`，改为从 `lib` 导入：
-
-- `rootDir` → `lib.rootDir`
-- `distDir` → `lib.distDir`
-
-这样 test 文件也跟随 `.env` 配置，不再自行假设 electron 项目位置。
-
-### `.env` 在不同宿主项目中的配置示例
-
-**electron 项目**（当前）：
-```
-HOST_ROOT=../3d_viewer_electron
-```
-
-**web 项目**（未来）：
-```
-HOST_ROOT=../3d_viewer_web
-DIST_DIR=../3d_viewer_web/dist        # web 项目的 dist 结构不同
-FIXTURE_DIR=../3d_viewer_web/public/models
-```
-
-如果未来 `distDir` 和 `fixtureDir` 的推导规则在不同宿主项目中不一致，可以在 `.env` 中额外配置 `DIST_DIR` 和 `FIXTURE_DIR` 覆盖默认推导值。
-
-### 不修改的文件清单
-
-以下文件完全不动：
-
-- `e1/` 下所有 `.mjs`
-- `e2/` 下所有 `.mjs`（包括 `m1.mjs`）
-- `e3/` 下所有 `.mjs`
-- `generate-subtitle.mjs`
-- `pregen-tts.mjs`
-- `generate-html-video.mjs`
-- `generate-image-video.mjs`
-- `generate-url-video.mjs`
-- `generate-image2-video.mjs`
-- `html-composer.mjs`
-- `lib_gen_url_image.mjs`
-- `burn.mjs`
-- `mergeVideo.mjs`
-- `coverClip.mjs`
-- `env.mjs`
-- `easyocr-mark.mjs`
-- `edit-marks.mjs`
-- `lib.mjs`
-
-### 修改的文件清单
-
-| 文件 | 改动范围 | 改动行数 |
-|------|---------|---------|
-| `screenplay/.env` | 新增 `HOST_ROOT=...` 一行 | +1 行 |
-| `lib-electron.mjs` | 顶部变量定义 + `getElectronExePath` | ~10 行 |
-| `tests/test-unloadModel.mjs` | `rootDir`/`distDir` 改为引用 lib 导出 | ~3 行 |
-
-### 向后兼容
-
-- 如果 `.env` 中没有 `HOST_ROOT`，行为回退到当前方式（假定 screenplay 在 electron 项目内）
-- 已有录制脚本的 CLI 调用方式不变
-- `lib.rootDir`、`lib.fixtureDir` 等导出保持不变
+1. 确保 `screenplay/.env` 中配置了 `3D_VIEWER_WEB_ROOT=../3d_viewer_web`
+2. 将 `3d_viewer_web/movies/p1/` 拷贝到 `screenplay/eN/`
+3. 将脚本中的 `import * as lib from '../lib.mjs'` 改为 `import * as lib from '../lib-web.mjs'`
+4. 运行脚本（CLI 参数不变）

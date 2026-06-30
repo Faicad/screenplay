@@ -1,7 +1,8 @@
 /**
  * Test: unloadModel + moveModelToScreenNdc with file target.
- * Run:  node movies/tests/test-unloadModel.mjs
+ * Run:  node tests/test-unloadModel.mjs
  *
+ * Requires 3D_VIEWER_ELECTRON_ROOT in .env to be set.
  * Starts viewer server + model server, loads two models,
  * verifies per-file unload doesn't affect remaining files,
  * and that path matching works with movie-style paths.
@@ -14,8 +15,9 @@ import { fileURLToPath } from 'url'
 import * as lib from '../lib.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-const rootDir = join(__dirname, '..', '..')
-const distDir = join(rootDir, 'dist')
+// Use lib.rootDir / lib.distDir from the Electron host config (.env: 3D_VIEWER_ELECTRON_ROOT)
+const rootDir = lib.rootDir
+const distDir = lib.distDir
 
 const MIME_MAP = {
   '.html': 'text/html',

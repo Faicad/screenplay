@@ -113,7 +113,7 @@ async function generateHyperVideo(scriptPath) {
     console.log(`Reusing existing subtitle (${entries.length} entries)`)
   } else {
     console.log(`\n=== Pre-generating TTS: ${scriptName} ===`)
-    const pregenArgs = ['movies/pregen-tts.mjs', scriptPath]
+    const pregenArgs = [join(lib.screenplayDir, 'pregen-tts.mjs'), scriptPath]
     if (ttsProvider) pregenArgs.push('--tts', ttsProvider)
     const pregenR = spawnSync('node', pregenArgs, { stdio: 'inherit', timeout: 600000 })
     if (pregenR.status !== 0) process.exit(pregenR.status ?? 1)
@@ -154,7 +154,11 @@ async function generateHyperVideo(scriptPath) {
     process.exit(1)
   }
 
-  const imageBase = parseImageBase(scriptPath)
+  let imageBase = parseImageBase(scriptPath)
+  // Resolve legacy movies/ paths relative to screenplay dir
+  if (imageBase && imageBase.startsWith('movies/')) {
+    imageBase = join(lib.screenplayDir, imageBase.slice(6))
+  }
   const segmentConfig = parseScriptConfig(scriptPath)
 
   // Parse optional per-segment config

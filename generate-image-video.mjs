@@ -176,7 +176,11 @@ async function generateImageVideo(scriptPath) {
   const scriptDir = dirname(scriptPath)
   const scriptName = basename(scriptPath, extname(scriptPath))
   const genDir = join(scriptDir, 'gen')
-  const imageBase = parseImageBase(scriptPath)
+  let imageBase = parseImageBase(scriptPath)
+  // Resolve legacy movies/ paths relative to screenplay dir
+  if (imageBase.startsWith('movies/')) {
+    imageBase = join(lib.screenplayDir, imageBase.slice(6))
+  }
 
   console.log(`Script: ${basename(scriptPath)}`)
   console.log(`Image base: ${imageBase}`)
@@ -213,7 +217,7 @@ async function generateImageVideo(scriptPath) {
   } else {
     // 1. Pre-generate TTS segments → populate cache
     console.log(`\n=== Pre-generating TTS timing: ${scriptName} ===`)
-    const pregenArgs = ['movies/pregen-tts.mjs', scriptPath]
+    const pregenArgs = [join(lib.screenplayDir, 'pregen-tts.mjs'), scriptPath]
     if (ttsProvider) pregenArgs.push('--tts', ttsProvider)
     const pregenR = spawnSync('node', pregenArgs, { stdio: 'inherit', timeout: 600000 })
     if (pregenR.status !== 0) process.exit(pregenR.status ?? 1)

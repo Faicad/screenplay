@@ -2,7 +2,7 @@ import { existsSync, readFileSync, statSync, readdirSync, rmSync, renameSync, wr
 import { join, dirname, basename, extname, relative, resolve } from 'path'
 import { pathToFileURL } from 'url'
 import { spawn, spawnSync } from 'child_process'
-import { DEFAULT_BGM } from './lib-electron.mjs'
+import { DEFAULT_BGM, screenplayDir } from './lib-electron.mjs'
 import { makeCoverClip } from './coverClip.mjs'
 
 /**
@@ -256,7 +256,7 @@ function mergeProject(dirPath) {
     console.log(`[${file}] Running burn.mjs ...`)
     console.log(`${'='.repeat(60)}`)
     const r = spawnSync('node', [
-      'movies/burn.mjs', scriptArg, ...forwardedFlags,
+      join(screenplayDir, 'burn.mjs'), scriptArg, ...forwardedFlags,
     ], { stdio: 'inherit', timeout: 600000 })
     if (r.status !== 0) {
       console.error(`  ✗ ${file} failed (exit ${r.status ?? 1})`)
@@ -289,7 +289,11 @@ function mergeProject(dirPath) {
   const mergeCfg = existsSync(mergeCfgPath)
     ? JSON.parse(readFileSync(mergeCfgPath, 'utf-8'))
     : {}
-  const bgmPath = mergeCfg.audioBg || DEFAULT_BGM
+  let bgmPath = mergeCfg.audioBg || DEFAULT_BGM
+  // Resolve legacy movies/ paths relative to screenplay dir
+  if (mergeCfg.audioBg?.startsWith('movies/')) {
+    bgmPath = join(screenplayDir, mergeCfg.audioBg.slice(6))
+  }
   if (mergeCfg.audioBg) console.log(`  BGM: ${mergeCfg.audioBg} (from merge.json)`)
 
   // ── Check force flag for merge's own cache ──

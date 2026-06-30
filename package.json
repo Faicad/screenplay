@@ -1,0 +1,10 @@
+{
+  "name": "screenplay",
+  "version": "1.0.0",
+  "description": "Record UI demo videos from any host application",
+  "type": "module",
+  "private": true,
+  "dependencies": {
+    "playwright": "^1.61.1"
+  }
+}

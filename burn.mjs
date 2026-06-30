@@ -1,8 +1,10 @@
 import { readFileSync } from 'fs'
-import { pathToFileURL } from 'url'
+import { pathToFileURL, fileURLToPath } from 'url'
 import { dirname, join, basename, extname } from 'path'
 import { spawnSync } from 'child_process'
-import { burnVideo } from './lib-electron.mjs'
+import { burnVideo, screenplayDir } from './lib-electron.mjs'
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
 
 const args = process.argv.slice(2)
 const scriptArg = args[0]
@@ -34,25 +36,25 @@ const ttsArgs = ttsIdx >= 0 ? ['--tts', args[ttsIdx + 1]] : []
 if (isSceneScript) {
   console.log(`\n=== Generating scene video: ${scriptName} ===`)
   const r = spawnSync('node', [
-    'movies/generate-html-video.mjs', absPath, '--no-burn', ...childFlags, ...ttsArgs,
+    join(screenplayDir, 'generate-html-video.mjs'), absPath, '--no-burn', ...childFlags, ...ttsArgs,
   ], { stdio: 'inherit', timeout: 600000 })
   if (r.status !== 0) process.exit(r.status ?? 1)
 } else if (isUrlScript) {
   console.log(`\n=== Generating URL video: ${scriptName} ===`)
   const r = spawnSync('node', [
-    'movies/generate-url-video.mjs', absPath, ...childFlags, ...ttsArgs,
+    join(screenplayDir, 'generate-url-video.mjs'), absPath, ...childFlags, ...ttsArgs,
   ], { stdio: 'inherit', timeout: 600000 })
   if (r.status !== 0) process.exit(r.status ?? 1)
 } else if (isImageScript) {
   console.log(`\n=== Generating image video: ${scriptName} ===`)
   const r = spawnSync('node', [
-    'movies/generate-image-video.mjs', absPath, '--no-burn', ...childFlags, ...ttsArgs,
+    join(screenplayDir, 'generate-image-video.mjs'), absPath, '--no-burn', ...childFlags, ...ttsArgs,
   ], { stdio: 'inherit', timeout: 600000 })
   if (r.status !== 0) process.exit(r.status ?? 1)
 } else if (isImageConfigScript) {
   console.log(`\n=== Generating image_config video: ${scriptName} ===`)
   const r = spawnSync('node', [
-    'movies/generate-image2-video.mjs', absPath, ...childFlags, ...ttsArgs,
+    join(screenplayDir, 'generate-image2-video.mjs'), absPath, ...childFlags, ...ttsArgs,
   ], { stdio: 'inherit', timeout: 600000 })
   if (r.status !== 0) process.exit(r.status ?? 1)
 } else {
@@ -70,7 +72,7 @@ if (!isSceneScript && !isImageScript && !isUrlScript && !isImageConfigScript) {
   const isForce = args.includes('-f') || args.includes('--force')
   if (isForce) subFlags.unshift('-f')
   const r = spawnSync('node', [
-    'movies/generate-subtitle.mjs', absPath, ...subFlags,
+    join(screenplayDir, 'generate-subtitle.mjs'), absPath, ...subFlags,
   ], { stdio: 'inherit', timeout: 600000 })
   if (r.status !== 0) process.exit(r.status ?? 1)
 }

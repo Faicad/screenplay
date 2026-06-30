@@ -21,7 +21,10 @@
 
 import { spawnSync } from 'child_process'
 import { existsSync, writeFileSync } from 'fs'
-import { resolve } from 'path'
+import { resolve, join, dirname } from 'path'
+import { fileURLToPath } from 'url'
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
 
 const [screenshot, outputJson, ...texts] = process.argv.slice(2)
 
@@ -36,7 +39,7 @@ if (!existsSync(absScreenshot)) {
   process.exit(1)
 }
 
-const r = spawnSync('python3', ['movies/easyocr-mark.py', absScreenshot, ...texts], {
+const r = spawnSync('python3', [join(__dirname, 'easyocr-mark.py'), absScreenshot, ...texts], {
   stdio: ['pipe', 'pipe', 'pipe'],
   timeout: 120000,
   maxBuffer: 50 * 1024 * 1024,

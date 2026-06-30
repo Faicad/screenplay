@@ -54,7 +54,7 @@ export async function generateVideo(scriptPath, { urls, mode, onBeforeRecord }) 
     console.log(`Reusing existing subtitle (${entries.length} entries, ${data.segments[0]?.duration?.toFixed(2) || '?'}s)`)
   } else {
     console.log(`\n=== Pre-generating TTS ===`)
-    const pregenArgs = ['movies/pregen-tts.mjs', scriptPath]
+    const pregenArgs = [join(lib.screenplayDir, 'pregen-tts.mjs'), scriptPath]
     if (ttsProvider) pregenArgs.push('--tts', ttsProvider)
     const pregenR = spawnSync('node', pregenArgs, { stdio: 'inherit', timeout: 600000 })
     if (pregenR.status !== 0) process.exit(pregenR.status ?? 1)
