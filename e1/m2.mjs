@@ -5,7 +5,7 @@ const subtitle = `
 有时甚至是几十秒
 `;
 
-const image = 'movies/screenshot/Downloads';
+const image = 'screenshot/Downloads';
 
 let _seg1StartTime = 0
 

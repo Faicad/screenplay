@@ -25,8 +25,8 @@ AI就在模型加载的时候，一次性生成所有贴图的缩略图
 
 lib.makeMovie(
   import.meta.url,
-  'movies/dungeon_warkarma.glb',
-  // 'movies/p1/exported.glb',
+  'dungeon_warkarma.glb',
+  // 'p1/exported.glb',
   {
     embed: '1',
     AutoRotate: '0',

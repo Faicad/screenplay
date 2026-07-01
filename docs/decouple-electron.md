@@ -2,14 +2,14 @@
 
 ## 需求
 
-`screenplay` 项目已从 `3d_viewer_electron/movies/` 移动为独立项目，位于 `3d_viewer_electron/../screenplay/`。目前代码仍假定 screenplay 是 electron 项目的子目录，需要解除这种位置依赖。
+`screenplay` 项目已从 `3d_viewer_electron/` 移动为独立项目，位于 `3d_viewer_electron/../screenplay/`。目前代码仍假定 screenplay 是 electron 项目的子目录，需要解除这种位置依赖。
 
 ## 目的
 
 - screenplay 不再硬编码任何宿主项目的文件路径
 - 同时支持 `3d_viewer_electron`（Electron 桌面端）和 `3d_viewer_web`（Web 端）两个宿主项目
 - 未来可扩展支持 `ficad_web` 等更多宿主
-- `3d_viewer_web/movies/p*/` 下的录制脚本拷贝到 screenplay 后只需改一行 import 即可运行
+- `3d_viewer_web/p*/` 下的录制脚本拷贝到 screenplay 后只需改一行 import 即可运行
 - 现有 electron 录制脚本（`e1/`、`e2/` 等）尽量不改动
 - 每个宿主项目的位置信息只在 screenplay 的 `.env` 文件中配置一次
 
@@ -150,7 +150,7 @@ Web 宿主项目的适配器，与 `lib-electron.mjs` 结构平行：
 
 **electron 录制脚本**（`e1/`、`e2/` 现有脚本）：完全不动。继续 `import * as lib from '../lib.mjs'`，继续使用 `lib.rootDir` 等。
 
-**web 录制脚本**（从 `3d_viewer_web/movies/p*/` 拷贝过来）：只改 import 行：
+**web 录制脚本**（从 `3d_viewer_web/p*/` 拷贝过来）：只改 import 行：
 
 ```
 - import * as lib from '../lib.mjs'
@@ -196,6 +196,6 @@ Web 宿主项目的适配器，与 `lib-electron.mjs` 结构平行：
 ### Web 项目录制脚本迁移步骤（未来参考）
 
 1. 确保 `screenplay/.env` 中配置了 `3D_VIEWER_WEB_ROOT=../3d_viewer_web`
-2. 将 `3d_viewer_web/movies/p1/` 拷贝到 `screenplay/eN/`
+2. 将 `3d_viewer_web/p1/` 拷贝到 `screenplay/eN/`
 3. 将脚本中的 `import * as lib from '../lib.mjs'` 改为 `import * as lib from '../lib-web.mjs'`
 4. 运行脚本（CLI 参数不变）

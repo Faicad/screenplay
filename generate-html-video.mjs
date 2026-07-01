@@ -155,10 +155,6 @@ async function generateHyperVideo(scriptPath) {
   }
 
   let imageBase = parseImageBase(scriptPath)
-  // Resolve legacy movies/ paths relative to screenplay dir
-  if (imageBase && imageBase.startsWith('movies/')) {
-    imageBase = join(lib.screenplayDir, imageBase.slice(6))
-  }
   const segmentConfig = parseScriptConfig(scriptPath)
 
   // Parse optional per-segment config
@@ -399,7 +395,7 @@ ${gsapCode}
 // ── CLI ──
 const scriptPath = resolve(process.argv[2])
 if (!scriptPath) {
-  console.error('Usage: node movies/generate-hyper-video.mjs [--tts edge-tts|tencent-tts|indextts|spark-tts] <script.mjs>')
+  console.error('Usage: node generate-hyper-video.mjs [--tts edge-tts|tencent-tts|indextts|spark-tts] <script.mjs>')
   process.exit(1)
 }
 if (!existsSync(scriptPath)) {

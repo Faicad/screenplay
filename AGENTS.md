@@ -1,6 +1,5 @@
 # Movies Skill — Agent Reference
 
-> `movies/` is a nearly independent video-generation module. Its only link to the parent project is the 3D viewer dev server (port 4173) needed for **Path A** (Playwright recording of Three.js scenes).
 
 ## Five Video Generation Paths
 
@@ -43,7 +42,7 @@ All paths produce `gen/{name}.subtitle` + `gen/{name}.mp3` + `gen/{name}_{h|v}.w
 
 ### Project Directory Convention
 
-Each project is a subdirectory under `movies/` (e.g., `p1/`, `e1/`, `e2/`). Source files only; generated files go into `gen/` (gitignored).
+Each project is a subdirectory under `` (e.g., `p1/`, `e1/`, `e2/`). Source files only; generated files go into `gen/` (gitignored).
 
 ### Script Template (Path A)
 
@@ -245,7 +244,7 @@ const subtitle = `
 `;
 const image_config = [
   {
-    image: 'movies/screenshot/step1',
+    image: 'screenshot/step1',
     description: '显示文字标注"xxx"',
     anim: [
       {
@@ -322,17 +321,17 @@ const image_config = [
 
 ```bash
 # Burn subtitles to single video (works for any path)
-node movies/burn.mjs movies/p1/m2.mjs
+node burn.mjs p1/m2.mjs
 
 # Merge multi-segment project
-node movies/mergeVideo.mjs movies/p1
+node mergeVideo.mjs p1
 
 # EasyOCR mark writing
-node movies/easyocr-mark.mjs screenshot.png marks.json "要查找的文字"
+node easyocr-mark.mjs screenshot.png marks.json "要查找的文字"
 
 # Orientation images from single source
 # (script in parent project scripts/)
-node scripts/gen-orient-images.mjs movies/screenshot/win.png
+node scripts/gen-orient-images.mjs screenshot/win.png
 ```
 
 ## Dependencies

@@ -15,7 +15,7 @@ function parseUrls(scriptPath) {
 // ── CLI ──
 const scriptPath = resolve(process.argv[2])
 if (!scriptPath || !existsSync(scriptPath)) {
-  console.error('Usage: node movies/generate-url-video.mjs [--tts edge-tts|tencent-tts] [--no-tts] [--no-burn] <script.mjs>')
+  console.error('Usage: node generate-url-video.mjs [--tts edge-tts|tencent-tts] [--no-tts] [--no-burn] <script.mjs>')
   process.exit(1)
 }
 

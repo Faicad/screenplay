@@ -13,5 +13,5 @@ const subtitle = `
 
 // 在xy平面一个边长17毫米的正方形，Z轴向上8毫米平行有一个边长18毫米的正方形，放样连接这两个正方形
 
-const image = 'movies/screenshot/p2/opencode';
+const image = 'screenshot/p2/opencode';
 

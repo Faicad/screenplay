@@ -9,7 +9,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const args = process.argv.slice(2)
 const scriptArg = args[0]
 if (!scriptArg) {
-  console.error('Usage: node movies/burn.mjs <script.mjs> [-s|-m|-g] [-h|-v] [-30] [-f] [--tts <provider>]')
+  console.error('Usage: node burn.mjs <script.mjs> [-s|-m|-g] [-h|-v] [-30] [-f] [--tts <provider>]')
   process.exit(1)
 }
 

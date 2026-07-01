@@ -21,7 +21,7 @@
 ### 输入
 
 ```javascript
-const image = 'movies/screenshot/p2/opencode';
+const image = 'screenshot/p2/opencode';
 ```
 
 `baseName = basename(image)` = `opencode`

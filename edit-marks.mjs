@@ -4,8 +4,8 @@
  * edit-marks.mjs — Visual marks.json editor with image overlay
  *
  * Usage:
- *   node movies/edit-marks.mjs movies/e1/ai_gen
- *   node movies/edit-marks.mjs movies/e1/ai_gen --script m5
+ *   node edit-marks.mjs e1/ai_gen
+ *   node edit-marks.mjs e1/ai_gen --script m5
  */
 
 import { createServer } from 'http';

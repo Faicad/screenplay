@@ -751,7 +751,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     }
   }
   if (!scriptPath) {
-    console.error('Usage: node movies/generate-subtitle.mjs [--tts spark-tts|edge-tts|tencent-tts|indextts] <script.mjs>')
+    console.error('Usage: node generate-subtitle.mjs [--tts spark-tts|edge-tts|tencent-tts|indextts] <script.mjs>')
     process.exit(1)
   }
   if (!existsSync(scriptPath)) {

@@ -201,7 +201,7 @@ export function resolveTtsProvider() {
 /**
  * Build HDR URL based on size preset.
  * With -g (1080p) returns the 4K version, otherwise returns the 2K version.
- * @param {string} name  e.g. '/movies/kloppenheim_02'
+ * @param {string} name  e.g. '/kloppenheim_02'
  */
 export function hdrUrl(name) {
   const suffix = resolveSizePreset() === SIZE_PRESETS.g ? '_4k' : '_2k'
@@ -211,7 +211,7 @@ export function hdrUrl(name) {
 /**
  * Set HDR environment map by filename.
  * @param {object} page  Playwright page
- * @param {string} name  e.g. '/movies/kloppenheim_02'
+ * @param {string} name  e.g. '/kloppenheim_02'
  * @param {number} [timeout=15000]
  */
 export async function setEnv(page, name, timeout = 15000) {

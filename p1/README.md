@@ -23,23 +23,23 @@
 所有步骤自动完成：录制 → 字幕 → 烧录 → 封面 → 合并：
 
 ```bash
-node movies/mergeVideo.mjs movies/p1
+node mergeVideo.mjs p1
 ```
 
 等价于依次执行：
-1. `node movies/p1/m1.mjs` — 录制 m1
-2. `node movies/p1/m3.mjs` — 录制 m3
-3. `node movies/generate-subtitle.mjs movies/p1/m1.mjs` — m1 字幕
-4. `node movies/generate-subtitle.mjs movies/p1/m3.mjs` — m3 字幕
-5. `node movies/burn.mjs movies/p1/m1.mjs` — 烧录 m1
-6. `node movies/burn.mjs movies/p1/m3.mjs` — 烧录 m3
-7. `node movies/p1/cover.mjs` — 封面预处理（加文字）
+1. `node p1/m1.mjs` — 录制 m1
+2. `node p1/m3.mjs` — 录制 m3
+3. `node generate-subtitle.mjs p1/m1.mjs` — m1 字幕
+4. `node generate-subtitle.mjs p1/m3.mjs` — m3 字幕
+5. `node burn.mjs p1/m1.mjs` — 烧录 m1
+6. `node burn.mjs p1/m3.mjs` — 烧录 m3
+7. `node p1/cover.mjs` — 封面预处理（加文字）
 8. FFmpeg 合并 → `gen/merged_h.mp4` + `gen/merged_v.mp4`
 
 **m2（截图合成）需手动执行**：
 
 ```bash
-node movies/generate-image-video.mjs movies/p1/m2.mjs
+node generate-image-video.mjs p1/m2.mjs
 ```
 
 ## 分步流程
@@ -47,8 +47,8 @@ node movies/generate-image-video.mjs movies/p1/m2.mjs
 ### 1. 录制视频（需要 headed 浏览器）
 
 ```bash
-node movies/p1/m1.mjs        # Voron Trident 爆炸
-node movies/p1/m3.mjs        # Car 材质+HDR
+node p1/m1.mjs        # Voron Trident 爆炸
+node p1/m3.mjs        # Car 材质+HDR
 ```
 
 输出到 `gen/mX_h.webm` / `gen/mX_v.webm`。
@@ -58,8 +58,8 @@ node movies/p1/m3.mjs        # Car 材质+HDR
 ### 2. 生成字幕 + 配音
 
 ```bash
-node movies/generate-subtitle.mjs movies/p1/m1.mjs
-node movies/generate-subtitle.mjs movies/p1/m3.mjs
+node generate-subtitle.mjs p1/m1.mjs
+node generate-subtitle.mjs p1/m3.mjs
 ```
 
 输出 `gen/mX.subtitle` + `gen/mX.mp3`。
@@ -67,8 +67,8 @@ node movies/generate-subtitle.mjs movies/p1/m3.mjs
 ### 3. 单文件烧录
 
 ```bash
-node movies/burn.mjs movies/p1/m1.mjs
-node movies/burn.mjs movies/p1/m3.mjs
+node burn.mjs p1/m1.mjs
+node burn.mjs p1/m3.mjs
 ```
 
 输出 `gen/mX_burn_{h|v}.mp4`。burn 阶段不处理封面。
@@ -76,7 +76,7 @@ node movies/burn.mjs movies/p1/m3.mjs
 ### 4. 封面预处理
 
 ```bash
-node movies/p1/cover.mjs
+node p1/cover.mjs
 ```
 
 读取 `gen/p1_cover_{h|v}.png`（录制时截图），生成 `gen/p1_cover_final_{h|v}.png`（添加居中白色文字 + 黑色描边，文字宽度 = 画面 80%）。
@@ -84,7 +84,7 @@ node movies/p1/cover.mjs
 ### 5. 合并
 
 ```bash
-node movies/mergeVideo.mjs movies/p1
+node mergeVideo.mjs p1
 ```
 
 自动发现所有片段 → burn → 拼接 + BGM + 封面。封面自动检测 `_final_` 版本。
@@ -94,6 +94,6 @@ node movies/mergeVideo.mjs movies/p1
 修改 `cover.mjs` 中的文字内容或样式，然后重新运行：
 
 ```bash
-node movies/p1/cover.mjs
-node movies/mergeVideo.mjs movies/p1
+node p1/cover.mjs
+node mergeVideo.mjs p1
 ```

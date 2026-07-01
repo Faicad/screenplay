@@ -27,7 +27,7 @@
 | 层 | 负责 | 文件 |
 |----|------|------|
 | **src/** | 动画引擎（函数封装、camera fit、GSAP 动画）、store、`window.__triggerEntryAnimation` API | `ViewportContainer.tsx`、`cameraFit.ts`、`engine-store.ts` |
-| **movies/** | 录制编排（`makeMovie`）、横竖屏自动方向（landscape→`left`, portrait→`top`）、`startRecording` 时序控制 | `lib.mjs` |
+| **** | 录制编排（`makeMovie`）、横竖屏自动方向（landscape→`left`, portrait→`top`）、`startRecording` 时序控制 | `lib.mjs` |
 
 src 只提供能力和 API；movies 负责什么时候调用以及传什么参数。
 
@@ -175,7 +175,7 @@ window.__triggerEntryAnimation(opts?)
 
 ## movies 层职责
 
-以下逻辑在 `movies/lib.mjs` 中实现，与 src 层无关：
+以下逻辑在 `lib.mjs` 中实现，与 src 层无关：
 
 ### 1. 横竖屏自动方向
 
@@ -228,12 +228,12 @@ await page.evaluate(() => window.__triggerEntryAnimation({
 
 - **新增** `__triggerEntryAnimation` 类型声明
 
-### `movies/lib.mjs`
+### `lib.mjs`
 
 - `makeMovie()` 中已实现横竖屏自动方向（见上文 movies 职责）
 - movie 脚本应调用 `page.evaluate(() => window.__triggerEntryAnimation({...}))` 控制动画时机
 
-### `movies/SKILL.md`
+### `SKILL.md`
 
 - 更新文档，说明三种入场动画、API 和 movies 层用法
 

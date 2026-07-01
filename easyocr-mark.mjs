@@ -2,17 +2,17 @@
  * Run easyocr on a screenshot to find text coordinates and write marks.json.
  *
  * Usage:
- *   node movies/easyocr-mark.mjs <screenshot.png> <output.json> <text1> [text2 ...]
+ *   node easyocr-mark.mjs <screenshot.png> <output.json> <text1> [text2 ...]
  *
  * Examples:
- *   node movies/easyocr-mark.mjs \
- *     movies/screenshot/win_h.png \
- *     movies/e1/ai_gen/m0_refactor_0000_h_marks.json \
+ *   node easyocr-mark.mjs \
+ *     screenshot/win_h.png \
+ *     e1/ai_gen/m0_refactor_0000_h_marks.json \
  *     "3D查看器"
  *
- *   node movies/easyocr-mark.mjs \
- *     movies/screenshot/3D查看器_h.png \
- *     movies/e1/ai_gen/m0_refactor_0002_h_marks.json \
+ *   node easyocr-mark.mjs \
+ *     screenshot/3D查看器_h.png \
+ *     e1/ai_gen/m0_refactor_0002_h_marks.json \
  *     "详细信息"
  *
  * Output marks.json format:
@@ -29,7 +29,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const [screenshot, outputJson, ...texts] = process.argv.slice(2)
 
 if (!screenshot || !outputJson || texts.length === 0) {
-  console.error(`Usage: node movies/easyocr-mark.mjs <screenshot.png> <output.json> <text1> [text2 ...]`)
+  console.error(`Usage: node easyocr-mark.mjs <screenshot.png> <output.json> <text1> [text2 ...]`)
   process.exit(1)
 }
 

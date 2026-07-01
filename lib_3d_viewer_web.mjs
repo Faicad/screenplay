@@ -197,7 +197,7 @@ export async function recordOne(browser, viewerUrl, viewport, suffix, pageFn, re
   })
 
   if (modelBuffer) {
-    await page.route('**/movies/*.glb', async (route) => {
+    await page.route('**/*.glb', async (route) => {
       await route.fulfill({
         contentType: 'model/gltf-binary',
         body: modelBuffer,
@@ -342,7 +342,7 @@ export async function makeMovie(scriptUrl, modelPath, viewerParams, pageFn, outp
   if (existsSync(moviesRoot)) {
     for (const f of readdirSync(moviesRoot)) {
       if (f.endsWith(`${hdrSuffix}.hdr`)) {
-        const url = `http://localhost:${MODEL_PORT}/movies/${f}`
+        const url = `http://localhost:${MODEL_PORT}/${f}`
         hdrBuffers.set(url, readFileSync(join(moviesRoot, f)))
       }
     }

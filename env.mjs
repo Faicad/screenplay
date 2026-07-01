@@ -22,7 +22,7 @@ export function loadDotEnv(envPath) {
   return vars
 }
 
-// Load shared movies/.env eagerly
+// Load shared .env eagerly
 loadDotEnv(join(__dir, '.env'))
 
 // Convenience: load a per-project .env from a script path

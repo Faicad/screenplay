@@ -21,7 +21,7 @@ Windows自带的3D查看器
 
 const image_config = [
   {
-    image: 'movies/screenshot/win',
+    image: 'screenshot/win',
     description: '开始1秒后高亮显示"3D查看器"图标并点击',
     anim: [
       {
@@ -44,7 +44,7 @@ const image_config = [
     ],
   },
   {
-    image: 'movies/screenshot/3D查看器',
+    image: 'screenshot/3D查看器',
     description: '显示文字标注"2026年6月30日结束 ⏰"',
     anim: [
       {

@@ -8,7 +8,7 @@ Windows自带的3D查看器
 
 const image_config = [
   {
-    image: 'movies/screenshot/win3',
+    image: 'screenshot/win3',
     description: '0,5秒后显示鼠标点击动画',
     anim: [
       {
@@ -20,7 +20,7 @@ const image_config = [
     ],
   },
   {
-    image: 'movies/screenshot/3D查看器',
+    image: 'screenshot/3D查看器',
     description: '1.5秒后在"2026年6月30日"文字上加蓝色边框5秒',
     anim: [
       {

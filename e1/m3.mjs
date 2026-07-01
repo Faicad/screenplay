@@ -4,4 +4,4 @@ const subtitle = `
 `;
 
 
-const image = 'movies/screenshot/BambuStudio';
+const image = 'screenshot/BambuStudio';

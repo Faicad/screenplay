@@ -36,7 +36,7 @@
 
 ## 1. TTS 预生成阶段
 
-### 新增文件 `movies/pregen-tts.mjs`
+### 新增文件 `pregen-tts.mjs`
 
 从 `generate-subtitle.mjs` 的 `generateSubtitle()` 中提取 TTS 生成逻辑，剥离视频相关校验。
 
@@ -82,14 +82,14 @@ pregenTts(scriptPath) → { groups, ttsTotal }
 ```
 makeMovie():
   ├─ 检查 {genDir}/{scriptName}.tts-timing.json 是否存在
-  ├─ 若不存在 (或 --force) → spawn 'node movies/pregen-tts.mjs <scriptPath>'
+  ├─ 若不存在 (或 --force) → spawn 'node pregen-tts.mjs <scriptPath>'
   ├─ 读取 .tts-timing.json 到内存
   └─ → 进入录制循环 (已拿到 TTS 分组时长)
 ```
 
 用户也可手动预生成：
 ```bash
-node movies/pregen-tts.mjs movies/p2/m2.mjs
+node pregen-tts.mjs p2/m2.mjs
 ```
 
 ### TTS 缓存复用
@@ -350,7 +350,7 @@ Group 0 的起点是 `tModelBrowser`，其中包含了 entry animation 时长。
 ### 4.5 `--force` 重生成
 
 ```bash
-node movies/p2/m2.mjs -f      # force re-record
+node p2/m2.mjs -f      # force re-record
 ```
 
 `--force` 应同时：
@@ -376,10 +376,10 @@ syncpoint(page)  // 可能等待 → 确保 group N+1 的 TTS 已播完 →
 
 | 文件 | 改动 | 说明 |
 |------|------|------|
-| `movies/pregen-tts.mjs` | **新增** | TTS 预生成 CLI + 导出函数 |
-| `movies/lib.mjs` | 修改 | `syncpoint()` 增加 TTS 感知等待 + 双向校验<br>`recordOne()` 注入 TTS timing + 隐式 syncpoint 延展<br>`startRecording()` 注入 `__tModelBrowser`<br>`makeMovie()` 自动调用 pregen-tts 并传递 timing |
-| `movies/generate-subtitle.mjs` | 修改 | 移除溢出校验（全局 + 分组），由 `syncpoint()` 的 console 诊断替代 |
-| `movies/SKILL.md` | 修改 | 更新流水线图示、新增节点说明 |
+| `pregen-tts.mjs` | **新增** | TTS 预生成 CLI + 导出函数 |
+| `lib.mjs` | 修改 | `syncpoint()` 增加 TTS 感知等待 + 双向校验<br>`recordOne()` 注入 TTS timing + 隐式 syncpoint 延展<br>`startRecording()` 注入 `__tModelBrowser`<br>`makeMovie()` 自动调用 pregen-tts 并传递 timing |
+| `generate-subtitle.mjs` | 修改 | 移除溢出校验（全局 + 分组），由 `syncpoint()` 的 console 诊断替代 |
+| `SKILL.md` | 修改 | 更新流水线图示、新增节点说明 |
 
 ### `generate-subtitle.mjs` 改动
 
@@ -559,4 +559,4 @@ makeMovie() 开始
 
 5. **`waitForTimeout` 延展的视频内容是静止帧**：隐式 syncpoint 在 pageFn 完成之后触发，此时 3D 场景已无动画，延展部分记录的是静态画面。这是预期行为——最后一段字幕通常只有少量配音，静态画面足够。
 
-6. **prepare-dist 不涉及**：此改动纯属 `movies/` 工具链，不影响 `src/renderer/` 应用代码，不参与 build 或 CI 测试。
+6. **prepare-dist 不涉及**：此改动纯属 `` 工具链，不影响 `src/renderer/` 应用代码，不参与 build 或 CI 测试。

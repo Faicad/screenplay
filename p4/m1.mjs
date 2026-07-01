@@ -24,7 +24,7 @@ AI一次性生成所有零部件的纹理缩略图
 
 lib.makeMovie(
   import.meta.url,
-  'movies/dungeon_warkarma.glb',
+  'dungeon_warkarma.glb',
   {
     embed: '1',
     AutoRotate: '0',

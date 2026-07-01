@@ -3,7 +3,7 @@ Run easyocr on a screenshot to find text coordinates.
 Output JSON to stdout with found text coordinates.
 
 Usage:
-  python movies/easyocr-mark.py <screenshot.png> <text1> [text2 ...]
+  python easyocr-mark.py <screenshot.png> <text1> [text2 ...]
 
 Output (stdout):
   {"text1": {"x": 100, "y": 200, "w": 50, "h": 20, "fullY": 200}, ...}

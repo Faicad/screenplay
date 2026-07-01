@@ -18,8 +18,8 @@ const subtitle = `
 
 lib.makeMovie(
   import.meta.url,
-  'movies/Trident_Assembly.glb',
-  // 'movies/p1/exported.glb',
+  'Trident_Assembly.glb',
+  // 'p1/exported.glb',
   { embed: '1', 
     AutoRotate: '0', 
     entryAnim: 'slide', 

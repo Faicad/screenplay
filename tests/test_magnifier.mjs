@@ -3,7 +3,7 @@ import * as lib from '../lib_3d_viewer_electron.mjs'
 
 lib.makeMovie(
   import.meta.url,
-  'movies/p2/1.stl',
+  'p2/1.stl',
   {
     AutoRotate: '0', entryZoomDist: '5', entryZoomEndDist: '2.5',
     entryDuration: '2000', entryTargetShiftY: '0',

@@ -8,9 +8,9 @@
  * identical text+voice across scripts share a single cache entry.
  *
  * Called automatically by makeMovie() before recording. Also usable standalone:
- *   node movies/pregen-tts.mjs movies/p2/m2.mjs
- *   node movies/pregen-tts.mjs --force movies/p2/m2.mjs
- *   node movies/pregen-tts.mjs --tts spark-tts movies/p2/m2.mjs
+ *   node pregen-tts.mjs p2/m2.mjs
+ *   node pregen-tts.mjs --force p2/m2.mjs
+ *   node pregen-tts.mjs --tts spark-tts p2/m2.mjs
  */
 
 import { existsSync, statSync, readFileSync, writeFileSync, mkdirSync } from 'fs'
@@ -224,7 +224,7 @@ async function pregenTts(scriptPath, { force = false, ttsProvider } = {}) {
 // ── CLI ──
 const scriptPath = resolve(process.argv[2])
 if (!scriptPath || !existsSync(scriptPath)) {
-  console.error('Usage: node movies/pregen-tts.mjs [--force] [--tts <provider>] <script.mjs>')
+  console.error('Usage: node pregen-tts.mjs [--force] [--tts <provider>] <script.mjs>')
   process.exit(1)
 }
 

@@ -2,7 +2,7 @@
  * Test silence parsing (---x---) — validates splitBySyncpoints, computeGroupDurations,
  * entry building cursor, and audio concat gap fill at group boundaries.
  *
- * Run: node movies/test-silence.mjs
+ * Run: node test-silence.mjs
  */
 
 import { existsSync } from 'fs'

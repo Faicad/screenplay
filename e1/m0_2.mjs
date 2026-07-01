@@ -4,7 +4,7 @@ Windows自带的3D查看器
 即将结束支持
 `;
 
-const image = 'movies/screenshot/3D查看器';
+const image = 'screenshot/3D查看器';
 
 const TEXT_CONFIG = {
   h: { top: 20, align: 'left', pad: 22, fontSize: 72 },

@@ -290,10 +290,6 @@ function mergeProject(dirPath) {
     ? JSON.parse(readFileSync(mergeCfgPath, 'utf-8'))
     : {}
   let bgmPath = mergeCfg.audioBg || DEFAULT_BGM
-  // Resolve legacy movies/ paths relative to screenplay dir
-  if (mergeCfg.audioBg?.startsWith('movies/')) {
-    bgmPath = join(screenplayDir, mergeCfg.audioBg.slice(6))
-  }
   if (mergeCfg.audioBg) console.log(`  BGM: ${mergeCfg.audioBg} (from merge.json)`)
 
   // ── Check force flag for merge's own cache ──
@@ -382,7 +378,7 @@ function mergeProject(dirPath) {
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   const arg = process.argv[2]
   if (!arg) {
-    console.error('Usage: node movies/mergeVideo.mjs <project-dir>')
+    console.error('Usage: node mergeVideo.mjs <project-dir>')
     console.error('  <project-dir>   — 项目目录：自动 burn + 合并；可选项目目录下的 merge.json 覆盖默认配置')
     process.exit(1)
   }

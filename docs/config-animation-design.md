@@ -17,7 +17,7 @@ const subtitle = `
 第二行台词
 `;
 
-const image = 'movies/screenshot/xxx';
+const image = 'screenshot/xxx';
 
 const config = [
   {},                                   // 第一行：无动画，独立图片

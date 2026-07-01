@@ -177,10 +177,6 @@ async function generateImageVideo(scriptPath) {
   const scriptName = basename(scriptPath, extname(scriptPath))
   const genDir = join(scriptDir, 'gen')
   let imageBase = parseImageBase(scriptPath)
-  // Resolve legacy movies/ paths relative to screenplay dir
-  if (imageBase.startsWith('movies/')) {
-    imageBase = join(lib.screenplayDir, imageBase.slice(6))
-  }
 
   console.log(`Script: ${basename(scriptPath)}`)
   console.log(`Image base: ${imageBase}`)
@@ -347,7 +343,7 @@ async function generateImageVideo(scriptPath) {
 // ── CLI ──
 const scriptPath = resolve(process.argv[2])
 if (!scriptPath) {
-  console.error('Usage: node movies/generate-image-video.mjs [--tts edge-tts|tencent-tts|indextts|spark-tts] <script.mjs>')
+  console.error('Usage: node generate-image-video.mjs [--tts edge-tts|tencent-tts|indextts|spark-tts] <script.mjs>')
   process.exit(1)
 }
 if (!existsSync(scriptPath)) {

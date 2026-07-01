@@ -30,7 +30,7 @@ const subtitle = `
 lib.makeMovie(
   import.meta.url,
   "C:\\Users\\yuan_\\Downloads\\新下载\\15cm哈兰德.3mf.glb",
-  // 'movies/p1/exported.glb',
+  // 'p1/exported.glb',
   {
     AutoRotate: '0',
     closeLeftPanel: '0;1',

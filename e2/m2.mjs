@@ -6,7 +6,7 @@ const subtitle = `
 
 const image_config = [
   {
-    image: 'movies/e2/end',
+    image: 'e2/end',
     description: '居中显示字幕动画“gitcode.com/faicad”，按标点符号分割为三段',
     anim: [
       {

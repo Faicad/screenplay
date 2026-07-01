@@ -53,8 +53,8 @@ AI很快就把Bug修复了
 
 lib.makeMovie(
   import.meta.url,
-  'movies/dungeon_warkarma.glb',
-  // 'movies/p1/exported.glb',
+  'dungeon_warkarma.glb',
+  // 'p1/exported.glb',
   {
     embed: '1',
     AutoRotate: '0',

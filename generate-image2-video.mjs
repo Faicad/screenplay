@@ -24,7 +24,7 @@ function resolveImagePath(imageBase, suffix) {
 // ── CLI ──
 const scriptPath = resolve(process.argv[2])
 if (!scriptPath || !existsSync(scriptPath)) {
-  console.error('Usage: node movies/generate-image2-video.mjs [--tts edge-tts|tencent-tts] [--no-tts] [--no-burn] [-f] <script.mjs>')
+  console.error('Usage: node generate-image2-video.mjs [--tts edge-tts|tencent-tts] [--no-tts] [--no-burn] [-f] <script.mjs>')
   process.exit(1)
 }
 

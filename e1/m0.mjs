@@ -3,7 +3,7 @@ const subtitle = `
 你知道吗，只剩三天时间
 `;
 
-const image = 'movies/screenshot/win';
+const image = 'screenshot/win';
 
 const CLICK_TARGET = {
   h: { x: 1170, y: 599 },

@@ -18,14 +18,14 @@
 ## 3. 脚本格式
 
 ```javascript
-// movies/e1/m0.mjs
+// e1/m0.mjs
 const subtitle = `
 只剩三天时间
 Windows自带的3D查看器
 即将结束支持
 `;
 
-const image = 'movies/screenshot/3D查看器';
+const image = 'screenshot/3D查看器';
 
 export function scene({ imagePath, width, height, duration, fps, index, startTime, totalDuration }) {
   const bg = `<div style="position:absolute;inset:0;background:#d8d8d8 url('${imagePath}') no-repeat center / contain"></div>`;
@@ -63,10 +63,10 @@ return '<div>...</div>'
 
 ## 4. 图片扫描机制
 
-脚本声明 `const image = 'movies/screenshot/基路径'`，系统自动扫描对应文件：
+脚本声明 `const image = 'screenshot/基路径'`，系统自动扫描对应文件：
 
 ```
-movies/screenshot/
+screenshot/
 ├── Downloads_h.png      ← 第1次截图（横屏）
 ├── Downloads_v.png      ← 第1次截图（竖屏）
 ├── Downloads_2_h.png    ← 第2次截图
@@ -140,7 +140,7 @@ generate-html-video.mjs
 ## 7. 文件结构
 
 ```
-movies/
+
 ├── generate-html-video.mjs    ← 生成器
 ├── burn.mjs                    ← 入口（检测 + 调度）
 ├── templates/

@@ -26,8 +26,8 @@ const subtitle = `
 
 lib.makeMovie(
   import.meta.url,
-  'movies/p2/1.stl',
-  // 'movies/p1/exported.glb',
+  'p2/1.stl',
+  // 'p1/exported.glb',
   {
     embed: '1',
     AutoRotate: '0',
@@ -45,8 +45,8 @@ lib.makeMovie(
     await page.waitForTimeout(2000)
     lib.syncpoint(page)
 
-    await lib.unloadModel(page, 'movies/p2/1.stl')
-    await lib.loadModel(page, 'movies/p2/2.stl', {
+    await lib.unloadModel(page, 'p2/1.stl')
+    await lib.loadModel(page, 'p2/2.stl', {
       resetCanvas: false,
       entryAnim: 'fade',
       entryDuration: '2000',
@@ -56,8 +56,8 @@ lib.makeMovie(
     await page.waitForTimeout(1000)
     lib.syncpoint(page)
 
-    await lib.unloadModel(page, 'movies/p2/2.stl')
-    await lib.loadModel(page, 'movies/p2/B.stl', {
+    await lib.unloadModel(page, 'p2/2.stl')
+    await lib.loadModel(page, 'p2/B.stl', {
       resetCanvas: false,
       entryAnim: 'fade',
       entryDuration: '2000',

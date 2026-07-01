@@ -12,10 +12,10 @@ const subtitle = `
 
 // 在xy平面一个边长17毫米的正方形，Z轴向上8毫米平行有一个边长18毫米的正方形，放样连接这两个正方形
 
-const image = 'movies/screenshot/p2/p2';
+const image = 'screenshot/p2/p2';
 
 
 // 上面的图片是通过下面的命令生成的
-// pwsh -c "& ./movies/screenshot-window.ps1 WorkBuddy"
-// python movies/mark-text-easyocr.py movies/screenshot/WorkBuddy_h.png "专家:left" "技能:top13-center50" "3d模型查看:top15" "SkillHub:top"
-// python movies/mark-text-easyocr.py movies/screenshot/WorkBuddy_v.png "专家:left" "技能:top13-center50" "3d模型查看:top15" "SkillHub:top"
+// pwsh -c "& ./screenshot-window.ps1 WorkBuddy"
+// python mark-text-easyocr.py screenshot/WorkBuddy_h.png "专家:left" "技能:top13-center50" "3d模型查看:top15" "SkillHub:top"
+// python mark-text-easyocr.py screenshot/WorkBuddy_v.png "专家:left" "技能:top13-center50" "3d模型查看:top15" "SkillHub:top"

@@ -25,8 +25,8 @@ const subtitle = `
 
 lib.makeMovie(
   import.meta.url,
-  'movies/car.glb',
-  // 'movies/p1/exported.glb',
+  'car.glb',
+  // 'p1/exported.glb',
   {
     embed: '1',
     AutoRotate: '0',

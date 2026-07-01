@@ -5,7 +5,7 @@ windows推荐的替代品(babylon.js sandbox)
 无法查看3D打印模型文件(3mf)
 `;
 
-const image = 'movies/screenshot/babylon';
+const image = 'screenshot/babylon';
 
 const TEXT_CONFIG = {
   h: { top: 47, align: 'center', pad: 10, fontSize: 62 },

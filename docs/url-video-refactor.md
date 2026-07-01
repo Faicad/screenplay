@@ -79,7 +79,7 @@ const urls = [
 
 AI Agent 即开发者本人（借助 LLM，如 Claude），负责：
 
-1. **运行 TTS** 生成字幕时间轴（`node movies/pregen-tts.mjs <script>` + `generate-subtitle.mjs`）
+1. **运行 TTS** 生成字幕时间轴（`node pregen-tts.mjs <script>` + `generate-subtitle.mjs`）
 2. **Playwright 访问 URL**，执行 `fullPage: true` 全页截图 → `{genDir}/{scriptName}_{NNNN}_h_full.png`
 3. **使用 Playwright DOM API 或页面源码分析**，根据 description 找到目标元素的选择器/坐标：
    - **文本内容定位**：`page.getByText()` 或 TreeWalker 找到文字坐标
@@ -436,7 +436,7 @@ HTML 合成阶段直接读取，不需要额外依赖。
 
 开发者（借助 LLM）手动操作：
 
-1. `node movies/pregen-tts.mjs <script>` — 生成 TTS 时间轴
+1. `node pregen-tts.mjs <script>` — 生成 TTS 时间轴
 2. Playwright 打开每个 URL → 截图 + DOM 分析 → 找到选择器/坐标
 3. 将坐标写入 `marks_{NNNN}.json`
 4. 计算 `triggerAt`（基于字幕时间轴），补全 `.mjs` 的 `anim` 数组
@@ -505,11 +505,11 @@ async function generateUrlVideo(scriptPath) {
 3. **type-text 模板** — GSAP 逐字显示模拟键盘输入
 4. **page-transition 模板库** — slide-right / slide-up / push 等过渡效果
 5. **自定义动画扩展机制** — `type: 'custom'` + 基类注册新类型
-6. **AI Agent 生成 .mjs** — 自动将定位结果写入 `movies/{project}/{script}.mjs`
+6. **AI Agent 生成 .mjs** — 自动将定位结果写入 `{project}/{script}.mjs`
 
 ### 第三阶段（远期，可选）
 
-1. **预览模式** — `node movies/burn.mjs --preview` 打开 HTML 合成结果预览（浏览器打开 index.html）
+1. **预览模式** — `node burn.mjs --preview` 打开 HTML 合成结果预览（浏览器打开 index.html）
 
 ### 决策矩阵
 
@@ -569,16 +569,16 @@ const fullY = rect.y + scrollY
 |------|------|------|
 | **开发者 (AI Agent)** | 人工+LLM | 理解 description，Playwright 截图+定位，补全 anim，生成 marks.json |
 | `generate-url-video.mjs` | 自动化执行 | 读已补全的 .mjs + marks → HTML 合成 → Playwright 录制 → 烧录字幕 |
-| `movies/html-composer.mjs` | 库 | GSAP 合成逻辑：接收 urls+marks+时间轴 → 输出 index.html |
+| `html-composer.mjs` | 库 | GSAP 合成逻辑：接收 urls+marks+时间轴 → 输出 index.html |
 
 ### 文件变更清单
 
 | 文件 | 变更 | 说明 |
 |------|------|------|
 | `generate-url-video.mjs` | 重写 | 读已补全 .mjs → HTML 合成(html-composer) → Playwright 录制 → 烧录字幕 |
-| `movies/html-composer.mjs` | 新建 | GSAP 合成逻辑：接收 urls(含 anim) + marks + 时间轴 → 输出 index.html |
+| `html-composer.mjs` | 新建 | GSAP 合成逻辑：接收 urls(含 anim) + marks + 时间轴 → 输出 index.html |
 | `generate-html-video.mjs` | 重构 | 提取公共合成器，URL 模式和 HyperFrames 共享 |
-| `movies/e1/m5.mjs` | 参考示例 | description → AI Agent(开发者)补全 anim |
+| `e1/m5.mjs` | 参考示例 | description → AI Agent(开发者)补全 anim |
 | `docs/url-video-refactor.md` | 更新 | 三步走流程 + AI Agent 角色定义 |
-| `movies/SKILL.md` | 更新 | 新增 URL 动画配置用法 + AI Agent 工作流 |
-| `movies/mark-text-easyocr.py` | 不变 | 其他场景仍在使用 |
+| `SKILL.md` | 更新 | 新增 URL 动画配置用法 + AI Agent 工作流 |
+| `mark-text-easyocr.py` | 不变 | 其他场景仍在使用 |

@@ -77,7 +77,7 @@ export function makeCoverClip(coverPng, outPath, targetW, targetH, fps = 25) {
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   const [png, out, w, h, fpsStr] = process.argv.slice(2)
   if (!png || !out || !w || !h) {
-    console.error('Usage: node movies/coverClip.mjs <cover.png> <output.mp4> <width> <height> [fps]')
+    console.error('Usage: node coverClip.mjs <cover.png> <output.mp4> <width> <height> [fps]')
     console.error('  <cover.png>   — 封面 PNG')
     console.error('  <output.mp4>  — 输出 1 帧视频')
     console.error('  <width>       — 目标宽度')

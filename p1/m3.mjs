@@ -28,7 +28,7 @@ ai会自动下载图片并替换
 
 lib.makeMovie(
   import.meta.url,
-  'movies/Car.glb',
+  'Car.glb',
   { embed: '1', 
     AutoRotate: '0', 
     entryAnim: 'zoom', 
@@ -81,7 +81,7 @@ lib.makeMovie(
     await page.waitForTimeout(1000)
     lib.syncpoint(page)
 
-    await lib.setEnv(page, '/movies/kloppenheim_02')
+    await lib.setEnv(page, '/kloppenheim_02')
     await page.waitForTimeout(3300)
 
     await lib.animateCamera(page, { rotate: 'y', duration: 5500, ease: 'none' })

@@ -2,7 +2,7 @@
  * Reproduce: first sentence not delayed by ---3000--- at beginning.
  * Reads the actual m1.mjs, runs through real pipeline functions.
  *
- * Run: node movies/tests/test-silence-bug.mjs
+ * Run: node tests/test-silence-bug.mjs
  */
 
 import { join, dirname } from 'path'

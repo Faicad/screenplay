@@ -5,7 +5,7 @@
 EasyOCR 对中英文混合文字的识别率通常优于 Tesseract。
 
 用法:
-  python movies/mark-text-easyocr.py <截图.png> "文字1:区域" "文字2:区域" ...
+  python mark-text-easyocr.py <截图.png> "文字1:区域" "文字2:区域" ...
 
 输出: {截图}_marked.png
 """

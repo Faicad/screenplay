@@ -52,7 +52,7 @@ const urls = [
 ## Step 1：运行 TTS
 
 ```bash
-node movies/pregen-tts.mjs <script.mjs>
+node pregen-tts.mjs <script.mjs>
 ```
 
 这会生成 `gen/<name>.subtitle`，其中包含每句台词的时间（秒）：
@@ -231,7 +231,7 @@ const rect = await page.$eval('.download-btn', el => {
 2. **可复现性**：页面改版后，不需要从头理解业务逻辑，直接改几个选择器就能重新运行
 3. **横向复用**：同类网站（如 GitHub、GitCode）的定位方法可直接复制到新脚本
 
-参考 `movies/e1/ai_gen/` 的示例结构：
+参考 `e1/ai_gen/` 的示例结构：
 
 ```
 ai_gen/
@@ -419,7 +419,7 @@ ai_gen/
 ## Step 4：生成视频
 
 ```bash
-node movies/generate-url-video.mjs <script.mjs> [--tts edge-tts] [--no-tts] [--no-burn]
+node generate-url-video.mjs <script.mjs> [--tts edge-tts] [--no-tts] [--no-burn]
 ```
 
 参数说明：
@@ -441,7 +441,7 @@ node movies/generate-url-video.mjs <script.mjs> [--tts edge-tts] [--no-tts] [--n
 
 ```bash
 # Step 1: TTS
-node movies/pregen-tts.mjs movies/e1/m5.mjs
+node pregen-tts.mjs e1/m5.mjs
 
 # Step 2: 截图 + 分析（手动，AI Agent 做）
 #   - 打开每个 URL
@@ -451,9 +451,9 @@ node movies/pregen-tts.mjs movies/e1/m5.mjs
 #   - 补全 m5.mjs 的 anim 数组
 
 # Step 3: 生成视频
-node movies/generate-url-video.mjs movies/e1/m5.mjs
+node generate-url-video.mjs e1/m5.mjs
 ```
 
 ## 完整参考示例
 
-参见 `movies/e1/m5.mjs` — 这是新格式的唯一参考脚本，包含完整的 `subtitle`、`urls`（含 `description` 和 `anim`）。
+参见 `e1/m5.mjs` — 这是新格式的唯一参考脚本，包含完整的 `subtitle`、`urls`（含 `description` 和 `anim`）。

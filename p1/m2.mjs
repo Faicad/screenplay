@@ -8,7 +8,7 @@ const subtitle = `
 就可以使用了。同时也支持claude code等\n ((npx skills add faicad/3d_viewer))
 `;
 
-const image = 'movies/screenshot/WorkBuddy';
+const image = 'screenshot/WorkBuddy';
 
 //请帮我通过5张图片生成视频，分别生成横屏和竖屏的视频。
 //视频的时长由上面的字幕决定。
@@ -21,7 +21,7 @@ const image = 'movies/screenshot/WorkBuddy';
 
 //最终所有的m1/m2/m3要合并，所以流程要兼容。
 
-// movies/screenshot
+// screenshot
 // ├── WorkBuddy_h.png
 // ├── WorkBuddy_h_marked_1.png
 // ├── WorkBuddy_h_marked_2.png
@@ -34,6 +34,6 @@ const image = 'movies/screenshot/WorkBuddy';
 // ├── WorkBuddy_v_marked_4.png
 
 // 上面的图片是通过下面的命令生成的
-// pwsh -c "& ./movies/screenshot-window.ps1 WorkBuddy"
-// python movies/mark-text-easyocr.py movies/screenshot/WorkBuddy_h.png "专家:left" "技能:top13-center50" "3d模型查看:top15" "SkillHub:top"
-// python movies/mark-text-easyocr.py movies/screenshot/WorkBuddy_v.png "专家:left" "技能:top13-center50" "3d模型查看:top15" "SkillHub:top"
+// pwsh -c "& ./screenshot-window.ps1 WorkBuddy"
+// python mark-text-easyocr.py screenshot/WorkBuddy_h.png "专家:left" "技能:top13-center50" "3d模型查看:top15" "SkillHub:top"
+// python mark-text-easyocr.py screenshot/WorkBuddy_v.png "专家:left" "技能:top13-center50" "3d模型查看:top15" "SkillHub:top"

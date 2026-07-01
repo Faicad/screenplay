@@ -31,7 +31,7 @@
 用户在录制脚本中用模板字符串声明字幕文本：
 
 ```javascript
-// movies/p1/m1.mjs
+// p1/m1.mjs
 
 const subtitle = `
 我给AI写了一个技能（SKILL)
@@ -100,7 +100,7 @@ const subtitle = `
 录制完成后，手动运行：
 
 ```bash
-node movies/generate-subtitle.mjs movies/p1/m1.mjs
+node generate-subtitle.mjs p1/m1.mjs
 ```
 
 ### 3.2 工作流程
@@ -129,13 +129,13 @@ node movies/generate-subtitle.mjs movies/p1/m1.mjs
 
 ```bash
 # 生成字幕+配音
-node movies/generate-subtitle.mjs movies/p1/m1.mjs
+node generate-subtitle.mjs p1/m1.mjs
 
 # 如果不满意，手动编辑
-vim movies/p1/gen/m1.subtitle
+vim p1/gen/m1.subtitle
 
 # 烧录
-node movies/burn.mjs movies/p1/m1.mjs
+node burn.mjs p1/m1.mjs
 ```
 
 ---
@@ -263,10 +263,10 @@ function toAssTime(seconds) {
 
 | 文件 | 职责 |
 |------|------|
-| `movies/generate-subtitle.mjs` | 解析 `.mjs` → 逐行 TTS → 实测时长 → `.subtitle` + `.mp3` |
-| `movies/generate-subtitle.mjs` | `cleanTtsText()` — TTS 文本清洗（去除括号） |
-| `movies/lib.mjs` | `buildAss()` — `.subtitle` → 临时 ASS；`renderVideo()` — 烧录 |
-| `movies/burn.mjs` | CLI 入口，读取 `.subtitle` 调用 `renderVideo` |
+| `generate-subtitle.mjs` | 解析 `.mjs` → 逐行 TTS → 实测时长 → `.subtitle` + `.mp3` |
+| `generate-subtitle.mjs` | `cleanTtsText()` — TTS 文本清洗（去除括号） |
+| `lib.mjs` | `buildAss()` — `.subtitle` → 临时 ASS；`renderVideo()` — 烧录 |
+| `burn.mjs` | CLI 入口，读取 `.subtitle` 调用 `renderVideo` |
 
 ---
 
