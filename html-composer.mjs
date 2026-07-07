@@ -4,6 +4,39 @@ import { fileURLToPath } from 'url'
 
 const GSAP_SRC = join(dirname(fileURLToPath(import.meta.url)), 'templates', 'gsap.min.js')
 
+// Read PNG natural width from IHDR (no external deps needed).
+function getPngWidth(p) {
+  try {
+    const b = readFileSync(p)
+    if (b.length >= 24 && b.readUInt32BE(0) === 0x89504e47) {
+      return b.readUInt32BE(16)
+    }
+  } catch { /* ignore */ }
+  return 0
+}
+
+// Scale a single mark object's coordinates from natural-image px to scene px.
+// Uniform scale (bg is rendered width:100%, height auto) applies to x/y/w/h/fullY
+// and to every per-char box.
+function scaleMarkValue(m, s) {
+  if (typeof m.x === 'number') m.x = Math.round(m.x * s)
+  if (typeof m.y === 'number') m.y = Math.round(m.y * s)
+  if (typeof m.w === 'number') m.w = Math.round(m.w * s)
+  if (typeof m.h === 'number') m.h = Math.round(m.h * s)
+  if (typeof m.fullY === 'number') m.fullY = Math.round(m.fullY * s)
+  if (Array.isArray(m.chars)) {
+    for (const ch of m.chars) scaleMarkValue(ch, s)
+  }
+}
+
+// Convert all marks of a scene from natural-image pixels to scene pixels, based on
+// the background image's actual width. For sources already at scene resolution the
+// scale is 1 and nothing changes (backward compatible).
+function scaleMarksToScene(marks, s) {
+  if (!marks || s === 1) return
+  for (const key of Object.keys(marks)) scaleMarkValue(marks[key], s)
+}
+
 export function buildHtmlComposition({ urls, marks, segments, imageDurations, genDir, aiGenDir, scriptName, suffix, width, height }) {
   const hfDir = join(genDir, `.hf_${scriptName}${suffix}`)
   mkdirSync(hfDir, { recursive: true })
@@ -51,6 +84,17 @@ export function buildHtmlComposition({ urls, marks, segments, imageDurations, ge
   }
   if (existsSync(GSAP_SRC)) {
     copyFileSync(GSAP_SRC, join(hfDir, 'gsap.min.js'))
+  }
+
+  // 方案C: scale marks from natural-image px → scene px, per background image width.
+  // Marks are authored in original-image pixels (e.g. by edit-marks.mjs); the bg is
+  // rendered at width:100% (= scene width), so multiplying by width/naturalWidth
+  // lands every mark on the same characters in the final video. Sources already at
+  // scene resolution get scale 1 → unchanged.
+  for (const g of groups) {
+    const bgPath = join(hfDir, `bg_${g.urlIndices[0]}.png`)
+    const nw = getPngWidth(bgPath)
+    if (nw) scaleMarksToScene(g.marks, width / nw)
   }
 
   // Scene timing: use cumulative imageDurations so silent gaps (INITIAL_GAP,

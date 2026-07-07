@@ -17,3 +17,4 @@ p*/*.3mf
 exported.stl
 __pycache__
 node_modules
+.workbuddy/

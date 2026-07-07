@@ -33,11 +33,10 @@ body{
 }
 #main{display:flex;flex:1;overflow:hidden}
 #editor-area{
-  flex:1;display:flex;align-items:center;justify-content:center;
-  padding:16px;overflow:auto;background:#0a0a14;position:relative
+  flex:1;display:block;overflow:auto;background:#0a0a14;position:relative;padding:16px
 }
-#image-container{position:relative;display:inline-block;box-shadow:0 0 30px rgba(0,0,0,.5)}
-#bg-image{display:block;max-width:75vw;max-height:calc(100vh - 80px);user-select:none;-webkit-user-drag:none}
+#image-container{position:relative;display:block;margin:0 auto;overflow:hidden;box-shadow:0 0 30px rgba(0,0,0,.5);background:#000}
+#bg-image{display:block;width:100%;user-select:none;-webkit-user-drag:none}
 #marks-layer{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none}
 .mark{position:absolute;pointer-events:all;cursor:move;z-index:1}
 .mark .box{
@@ -166,6 +165,10 @@ const img=$('bg-image'), ml=$('marks-layer'), mk=$('marksList');
 const pos=$('posInfo'), lbl=$('fileLabel'), no=$('noMsg'), dot=$('saveDot');
 const pp=$('pp'), ph=$('ph');
 
+function sceneDims(orient){
+  // default 1080p preset: h → 1920x1080, v → 1080x1440
+  return orient==='v' ? {w:1080,h:1440} : {w:1920,h:1080}
+}
 function scl(){return S.iNat.w?S.dsp.w/S.iNat.w:1}
 function td(v){return Math.round(v*scl())}
 
@@ -196,13 +199,17 @@ async function go(i){
   const it=S.items[i];
   lbl.textContent=it.id;
   const orientLabel=it.orient==='h'?'H':(it.orient==='v'?'V':it.orient);
-  pos.textContent=(i+1)+' / '+S.items.length+'  '+orientLabel+'  ('+it.prefix+')';
+  const sd=sceneDims(it.orient);
+  pos.textContent=(i+1)+' / '+S.items.length+'  '+orientLabel+'  ('+it.prefix+')  '+sd.w+'×'+sd.h;
   $('btnPrev').disabled=i===0;$('btnNext').disabled=i>=S.items.length-1;
   await loadData();
 }
 
 async function loadData(){
   const it=S.items[S.idx];if(!it)return;
+  const sd=sceneDims(it.orient);
+  const ic=$('image-container');
+  ic.style.width=sd.w+'px';ic.style.height=sd.h+'px';
   const r=await fetch('/api/scene/'+it.id);
   if(!r.ok){tst('Failed to load',1);return}
   const d=await r.json();S.marks=d.marks||{};
