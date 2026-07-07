@@ -327,7 +327,9 @@ export async function makeMovie(scriptUrl, modelPath, viewerParams, pageFn, outp
   }
 
   const viewerServer = await createStaticServer(distDir, VIEWER_PORT)
-  const modelServer = await createStaticServer(rootDir, MODEL_PORT)
+  // Models resolve relative to the screenplay project root (screenplayDir),
+  // not the 3d_viewer_web root — model assets (e.g. p2/*.stl) live alongside scripts.
+  const modelServer = await createStaticServer(screenplayDir, MODEL_PORT)
 
   const MODEL_URL = `http://localhost:${MODEL_PORT}/${modelPath}`
   console.log(`Model:  ${MODEL_URL}`)
@@ -335,7 +337,7 @@ export async function makeMovie(scriptUrl, modelPath, viewerParams, pageFn, outp
   const preset = resolveSizePreset()
   console.log(`Size preset: ${preset.label} (${preset.orientations.map(o => `${o.width}×${o.height}`).join(', ')})`)
 
-  const modelBuffer = readFileSync(join(rootDir, modelPath))
+  const modelBuffer = readFileSync(join(screenplayDir, modelPath))
   const hdrSuffix = preset === SIZE_PRESETS.g ? '_4k' : '_2k'
   const hdrBuffers = new Map()
   const moviesRoot = join(rootDir, 'movies')
