@@ -12,58 +12,85 @@ const testFiles = readdirSync(testsDir)
 
 let passed = 0
 let failed = 0
+let skipped = 0
 const failedNames = []
+const skippedNames = []
+
+// Definitive failure markers. Deliberately NOT a case-insensitive "FAIL"
+// scan: tests define a color-code constant `const FAIL = ...` whose value
+// contains the substring "FAIL", which would otherwise cause false positives
+// for passing tests. We only treat a test as failed when it emits a clear
+// failure signal or exits non-zero.
+const failureMarkers = /❌|SOME FAILED|FAILED/
+
+function printRelevant(output) {
+  const lines = output.split('\n').filter(Boolean).slice(-15)
+  for (const line of lines) {
+    if (/❌|FAIL|Error|error|SOME FAILED|failed/i.test(line)) {
+      console.log(`  ${line.trim()}`)
+    }
+  }
+}
 
 for (const file of testFiles) {
   const filePath = path.join(testsDir, file)
   process.stdout.write(`▶ ${file} ... `)
 
+  let status = 0
+  let output = ''
   try {
-    const { status, stdout, stderr } = await new Promise((resolve, reject) => {
-      const child = spawn('node', [filePath], {
+    const child = await new Promise((resolve, reject) => {
+      const c = spawn('node', [filePath], {
         cwd: repoRoot,
         stdio: ['ignore', 'pipe', 'pipe'],
         shell: true,
       })
       let stdout = '', stderr = ''
-      child.stdout.on('data', d => { stdout += d })
-      child.stderr.on('data', d => { stderr += d })
-      child.on('close', code => resolve({ status: code, stdout, stderr }))
-      child.on('error', reject)
+      c.stdout.on('data', d => { stdout += d })
+      c.stderr.on('data', d => { stderr += d })
+      c.on('close', code => resolve({ status: code, output: stdout + stderr }))
+      c.on('error', reject)
     })
-
-    // Some tests (e.g. test_magnifier.mjs) track failures via boolean but
-    // never call process.exit(1). Check output for failure indicators too.
-    const output = stdout + stderr
-    const hasFailure = /FAIL|SOME FAILED/i.test(output)
-    const effectiveExit = (status === 0 && !hasFailure) ? 0 : 1
-
-    if (effectiveExit === 0) {
-      console.log('PASS')
-      passed++
-    } else {
-      console.log('FAIL')
-      failed++
-      failedNames.push(file)
-      // Print last relevant lines
-      const lines = output.split('\n').filter(Boolean).slice(-15)
-      for (const line of lines) {
-        if (/FAIL|Error|error|SOME FAILED/.test(line)) {
-          console.log(`  ${line.trim()}`)
-        }
-      }
-    }
+    status = child.status
+    output = child.output
   } catch (err) {
-    console.log('FAIL (spawn error)')
+    console.log('ERROR (spawn)')
     failed++
     failedNames.push(file + ' (spawn error)')
     console.log(`  ${err.message}`)
+    continue
+  }
+
+  if (status === 2) {
+    // Explicit SKIP protocol (tests call process.exit(2) when runtime deps
+    // such as the Electron viewer are unavailable).
+    console.log('SKIP')
+    skipped++
+    skippedNames.push(file)
+  } else if (status === 0) {
+    if (failureMarkers.test(output)) {
+      console.log('FAIL')
+      failed++
+      failedNames.push(file)
+      printRelevant(output)
+    } else {
+      console.log('PASS')
+      passed++
+    }
+  } else {
+    console.log('FAIL')
+    failed++
+    failedNames.push(file)
+    printRelevant(output)
   }
 }
 
-const total = passed + failed
-console.log(`\n── Results: ${passed}/${total} passed`)
+const total = passed + failed + skipped
+console.log(`\n── Results: ${passed} passed, ${failed} failed, ${skipped} skipped (${total} total)`)
 if (failed > 0) {
   console.log(`   Failed: ${failedNames.join(', ')}`)
   process.exit(1)
+}
+if (skipped > 0) {
+  console.log(`   Skipped: ${skippedNames.join(', ')}`)
 }

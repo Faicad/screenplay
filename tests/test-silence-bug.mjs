@@ -99,15 +99,22 @@ console.log(`  Lines: ${lines.length}`)
 console.log(`  Line 0: "${lines[0]}"`)
 console.log(`  Line 1: "${lines[1]}"`)
 
-assert(lines[0] === '---3000---', `Line 0 is ---3000---`)
-assert(lines[1] === 'STL文件——最常见的3D打印格式', 'Line 1 is first TTS')
+// The leading silence duration is fixture-dependent — derive it from the
+// script instead of hardcoding, so the test stays valid if the fixture
+// (e.g. e2/m1.mjs) changes its opening silence.
+const leadingSilenceMatch = lines[0].match(/^---(\d+)---$/)
+assert(!!leadingSilenceMatch, `Line 0 is a leading silence marker (got "${lines[0]}")`)
+const SIL_MS = leadingSilenceMatch ? parseInt(leadingSilenceMatch[1], 10) : 0
+const SIL_SECS = SIL_MS / 1000
+const EXPECTED_FIRST_ENTRY_S = round2(INITIAL_GAP + SIL_SECS)
+assert(!/^---(\d+)---$/.test(lines[1]), 'Line 1 is the first TTS (not a silence marker)')
 
 // 2. Split by syncpoints
 const { groups, markerCount } = splitBySyncpoints(lines)
 assert(groups.length === 25, `25 groups (got ${groups.length})`)
 assert(groups[0].length === 2, `Group 0 has 2 lines (got ${groups[0].length})`)
-assert(groups[0][0] === '---3000---', 'Group 0[0] is silence')
-assert(groups[0][1] === 'STL文件——最常见的3D打印格式', 'Group 0[1] is TTS')
+assert(leadingSilenceMatch && groups[0][0] === lines[0], 'Group 0[0] is the leading silence marker')
+assert(!/^---(\d+)---$/.test(groups[0][1]), 'Group 0[1] is TTS (not silence)')
 
 // 3. Build segments (same logic as generate-subtitle.mjs)
 const segments = []
@@ -128,7 +135,7 @@ for (let g = 0; g < groups.length; g++) {
 
 assert(segments.length > 0, 'Segments created')
 assert(segments[0].isSilence === true, 'Segments[0] is silence')
-assert(segments[0].duration === 3.0, 'Segments[0] duration = 3.0')
+assert(segments[0].duration === SIL_SECS, `Segments[0] duration = ${SIL_SECS}`)
 assert(segments[1].isSilence === false, 'Segments[1] is TTS')
 
 // 4. Compute group durations (timing.json simulation)
@@ -137,7 +144,7 @@ console.log(`\n  Group 0 totalDuration: ${timing.groups[0].totalDuration.toFixed
 console.log(`  Group 1 totalDuration: ${timing.groups[1].totalDuration.toFixed(2)}s`)
 console.log(`  TTS total: ${timing.ttsTotal.toFixed(2)}s`)
 
-assert(timing.groups[0].totalDuration > 3.0, `Group 0 duration includes silence (${timing.groups[0].totalDuration})`)
+assert(timing.groups[0].totalDuration > SIL_SECS, `Group 0 duration includes silence (${timing.groups[0].totalDuration})`)
 
 // 5. Build entries with realistic syncpoints
 // Simulate: elapsed = 1.5s (entry anim) + 3.0s (rotateModel) = 4.5s
@@ -155,15 +162,15 @@ console.log(`  First text: "${firstEntry?.t}"`)
 console.log(`  Expected: s >= ${(INITIAL_GAP + 3.0).toFixed(2)}s`)
 
 assert(firstEntry !== undefined, 'First entry exists')
-assert(firstEntry.s >= INITIAL_GAP + 3.0,
-  `❓ First entry s=${firstEntry.s.toFixed(2)} >= ${(INITIAL_GAP + 3.0).toFixed(2)} ? ${firstEntry.s >= INITIAL_GAP + 3.0}`)
-assert(firstEntry.s === INITIAL_GAP + 3.0,
-  `FIRST ENTRY DELAY: s = ${firstEntry.s.toFixed(2)}s (= INITIAL_GAP(${INITIAL_GAP}) + ---3000---(3.0))`)
+assert(firstEntry.s >= EXPECTED_FIRST_ENTRY_S,
+  `❓ First entry s=${firstEntry.s.toFixed(2)} >= ${EXPECTED_FIRST_ENTRY_S.toFixed(2)} ? ${firstEntry.s >= EXPECTED_FIRST_ENTRY_S}`)
+assert(firstEntry.s === EXPECTED_FIRST_ENTRY_S,
+  `FIRST ENTRY DELAY: s = ${firstEntry.s.toFixed(2)}s (= INITIAL_GAP(${INITIAL_GAP}) + leading silence(${SIL_SECS}))`)
 
 // 6. Audio concat: when does first TTS play?
 const audio = simulateAudioParts(segments, entries)
 console.log(`\n  Audio first TTS at: ${audio.firstTtsAt.toFixed(2)}s`)
-assert(audio.firstTtsAt === INITIAL_GAP + 3.0,
+assert(audio.firstTtsAt === EXPECTED_FIRST_ENTRY_S,
   `Audio delay matches: ${audio.firstTtsAt.toFixed(2)}s`)
 
 // ════════════════════════════════════════════════════════════════
@@ -175,5 +182,5 @@ if (f > 0) {
   process.exit(1)
 } else {
   console.log(`✅ Pipeline produces correct timing — ` +
-    `first entry delayed by 3.5s`)
+    `first entry delayed by ${EXPECTED_FIRST_ENTRY_S.toFixed(2)}s (INITIAL_GAP + leading silence)`)
 }
