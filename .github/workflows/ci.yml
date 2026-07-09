@@ -52,9 +52,23 @@ jobs:
           pnpm install
           pnpm build:unpacked:linux
 
+      - name: Debug dist structure
+        run: ls -laR ../3d_viewer_electron/dist/linux-unpacked/ | head -40
+
       - name: Set Electron env vars
         run: |
-          EXE=$(find ../3d_viewer_electron/dist/linux-unpacked -maxdepth 1 -type f -executable ! -name '*.so*' ! -name 'chrome-sandbox' 2>/dev/null | head -1)
+          DIR=../3d_viewer_electron/dist/linux-unpacked
+          if [ -d "$DIR" ]; then
+            EXE=$(find "$DIR" -maxdepth 1 -type f -executable ! -name '*.so*' ! -name 'chrome-sandbox' 2>/dev/null | head -1)
+            if [ -z "$EXE" ]; then
+              # try subdirectories (electron-builder sometimes nests)
+              EXE=$(find "$DIR" -type f -executable ! -name '*.so*' ! -name 'chrome-sandbox' 2>/dev/null | head -1)
+            fi
+          fi
+          if [ -z "$EXE" ]; then
+            echo "::error::Could not find Electron binary in $DIR"
+            exit 1
+          fi
           echo "ELECTRON_EXE=$EXE" >> "$GITHUB_ENV"
           echo "3D_VIEWER_ELECTRON_ROOT=${{ github.workspace }}/../3d_viewer_electron" >> "$GITHUB_ENV"
           echo "Electron binary: $EXE"
