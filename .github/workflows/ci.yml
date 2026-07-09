@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg xvfb
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Install system deps & Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+
+      - name: Install Python packages
+        run: pip install edge-tts
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Clone 3d_viewer_electron
+        run: git clone --depth 1 https://github.com/Faicad/3d_viewer_electron.git ../3d_viewer_electron
+
+      - name: Build 3d_viewer_electron (linux unpacked)
+        run: |
+          cd ../3d_viewer_electron
+          pnpm install
+          pnpm build:unpacked:linux
+
+      - name: Set Electron env vars
+        run: |
+          EXE=$(find ../3d_viewer_electron/dist/linux-unpacked -maxdepth 1 -type f -executable ! -name '*.so*' ! -name 'chrome-sandbox' 2>/dev/null | head -1)
+          echo "ELECTRON_EXE=$EXE" >> "$GITHUB_ENV"
+          echo "3D_VIEWER_ELECTRON_ROOT=${{ github.workspace }}/../3d_viewer_electron" >> "$GITHUB_ENV"
+          echo "Electron binary: $EXE"
+
+      - name: Run tests (with virtual display)
+        run: xvfb-run --auto-servernum node run-tests.mjs
