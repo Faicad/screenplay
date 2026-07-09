@@ -10,7 +10,7 @@ old
 skip*.mjs
 **/gen/*
 **/ai_gen/*.png
-screenshot/*
+**/screenshot/*
 pretrained_models/*
 p*/*.stl
 p*/*.3mf

@@ -43,7 +43,7 @@ lib.makeMovie(
   async (page, suffix, tPageOpen) => {
     // 1. 相机从高处俯视慢慢变为平视 (3秒)
     await page.evaluate(async () => {
-      const dev = window.__r3f_dev
+      const dev = window.__engine_dev
       const camera = dev.camera
       const controls = dev.controls
       const target = controls.target
@@ -199,7 +199,7 @@ lib.makeMovie(
     //   const upIndex = up === 'z' ? 2 : 1 // 0=x, 1=y, 2=z
 
     //   // Compute model bounding box size
-    //   const dev = window.__r3f_dev
+    //   const dev = window.__engine_dev
     //   const box = new THREE.Box3()
     //   let hasGeom = false
     //   if (dev?.scene) {

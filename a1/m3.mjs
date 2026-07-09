@@ -1,20 +1,32 @@
 const subtitle = `
-我先问它
+我先丢给它一张屏幕截图，然后问它
 你能否识别这张图
 图中齿轮有错位
 如果你能看到是哪里的问题，告诉我
 我没让它一上来就解决问题
-因为它要要是发现不了问题
+因为它要是发现不了问题
 我就打算直接放弃
-因为它的优势在于多模态，可识别图像
-我不相信它的纯编程能力超过deepseek
+因为混元3的优势在于多模态，可识别图像
+但是模型本身参数太少
+我不相信它的纯编程能力
 `;
 
 
 const image_config = [
   {
     image: 'screenshot/gear1',
-    description: '显示聊天截图',
+    description: '',
+    anim: [
+      {
+        type: 'overlay-image',
+        image: 'screenshot/gear.png',
+        triggerAt: 1.5,
+        width: 500,
+        height: 500,
+        position: 'center',
+        top: { h: 120, v: -150 },
+      },
+    ],
   },
   {
     image: '',
@@ -60,6 +72,10 @@ const image_config = [
         highlightMs: 3600,
       },
     ],
+  },
+  {
+    image: '',
+    description: '',
   },
   {
     image: '',

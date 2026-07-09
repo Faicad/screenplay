@@ -86,6 +86,23 @@ export function buildHtmlComposition({ urls, marks, segments, imageDurations, ge
     copyFileSync(GSAP_SRC, join(hfDir, 'gsap.min.js'))
   }
 
+  // Copy overlay images referenced by overlay-image anims
+  const scriptDir = dirname(genDir)
+  for (const g of groups) {
+    const sceneIdx = g.urlIndices[0]
+    for (let ai = 0; ai < (g.anims || []).length; ai++) {
+      const step = g.anims[ai]
+      if (step.type === 'overlay-image' && step.image) {
+        const srcPath = join(scriptDir, step.image)
+        if (existsSync(srcPath)) {
+          copyFileSync(srcPath, join(hfDir, `overlay_${sceneIdx}_${ai}.png`))
+        } else {
+          console.warn(`  WARN: overlay image not found: ${srcPath}`)
+        }
+      }
+    }
+  }
+
   // 方案C: scale marks from natural-image px → scene px, per background image width.
   // Marks are authored in original-image pixels (e.g. by edit-marks.mjs); the bg is
   // rendered at width:100% (= scene width), so multiplying by width/naturalWidth
@@ -181,6 +198,7 @@ export function buildHtmlComposition({ urls, marks, segments, imageDurations, ge
     /* Arrow on top edge — annotation below target, arrow points up */
     .text-annotation.bottom::after{bottom:100%;left:50%;transform:translateX(-50%);border-bottom-color:#ff6b35}
     .caption{position:absolute;font-weight:bold;font-family:'Microsoft YaHei','PingFang SC',sans-serif;text-shadow:0 4px 20px rgba(0,0,0,.95);white-space:nowrap;pointer-events:none}
+    .overlay-image{position:absolute;pointer-events:none;opacity:0;-webkit-mask-image:radial-gradient(ellipse,black 65%,transparent 100%);mask-image:radial-gradient(ellipse,black 65%,transparent 100%)}
     .cursor-overlay{position:absolute;pointer-events:none;z-index:100}
     .cursor-pointer{width:32px;height:32px;background:radial-gradient(circle,#fff 2px,#000 2px,#000 4px,transparent 4px);border-radius:50%;position:absolute}
     .move-cursor{width:48px;height:60px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 40'%3E%3Cpath d='M0 0 L0 32 L8 24 L16 36 L20 34 L12 22 L28 22 Z' fill='white' stroke='%23222' stroke-width='2.5' stroke-linejoin='round'/%3E%3C/svg%3E");background-size:contain;background-repeat:no-repeat;position:absolute;pointer-events:none;filter:drop-shadow(1px 2px 3px rgba(0,0,0,0.5))}
@@ -304,6 +322,21 @@ function buildSceneHtml(scene, marks, index, width, height) {
         } else {
           sceneExtras += `<div class="caption" id="s${index}_c${ai}" style="${style};opacity:0">${step.text}</div>`
         }
+      } else if (step.type === 'overlay-image') {
+        const ovW = step.width || 300
+        const ovH = step.height || 300
+        const pos = step.position || 'bottom-center'
+        const isLandscape = width > height
+        let posStyle
+        if (pos === 'bottom-center') {
+          posStyle = 'left:50%;bottom:0;transform:translateX(-50%)'
+        } else if (pos === 'center') {
+          const topPx = step.top != null ? hv(step.top, isLandscape) : 0
+          posStyle = `left:50%;top:calc(50% + ${topPx}px);transform:translate(-50%,-50%)`
+        } else {
+          posStyle = 'top:0;left:0'
+        }
+        sceneExtras += `<img class="overlay-image" id="s${index}_overlay${ai}" src="overlay_${index}_${ai}.png" style="width:${ovW}px;height:${ovH}px;${posStyle}">`
       }
       continue
     }
@@ -481,6 +514,10 @@ function buildSceneGsap(scene, marks, sceneIndex, sceneStart, sceneDuration, wid
         } else if (trans === 'fade') {
           chunks.push(`  tl.fromTo('#s${sceneIndex}', {opacity:0},{opacity:1,duration:${dur.toFixed(2)},ease:"power1.out"}, ${t.toFixed(3)});`)
         }
+        break
+      }
+      case 'overlay-image': {
+        chunks.push(`  tl.to('#s${sceneIndex}_overlay${ai}', {opacity:1,duration:0.3}, ${t.toFixed(3)});`)
         break
       }
       case 'custom': {

@@ -157,7 +157,7 @@ body{
 
 <script>
 const S = {
-  items:[], idx:0, marks:{}, sel:null,
+  items:[], view:[], idx:0, marks:{}, sel:null,
   imgOk:false, iNat:{w:0,h:0}, dsp:{w:0,h:0}, chg:false
 };
 const $ = id=>document.getElementById(id);
@@ -183,30 +183,35 @@ async function load(){
   if(!S.items.length){no.style.display='block';return}
   const scripts=[...new Set(S.items.map(s=>s.scriptName))];
   const sel=$('scriptSelect');
-  sel.innerHTML=scripts.map(s=>'<option value="'+s+'">'+s+'</option>').join('');
-  sel.onchange=()=>{
-    const si=S.items.findIndex(x=>x.scriptName===sel.value);
-    if(si>=0)go(si);
-  };
-  if(scripts.length>1)$('scriptNav').style.display='flex';
-  const first=scripts[0];S.items=S.items.filter(s=>s.scriptName===first);
-  if(S.items.length)await go(0);
+  // 默认「全部」：不筛选，可编辑本项目里所有截图标注
+  sel.innerHTML='<option value="">全部</option>'+scripts.map(s=>'<option value="'+s+'">'+s+'</option>').join('');
+  sel.value='';
+  sel.onchange=applyScriptFilter;
+  if(scripts.length>0)$('scriptNav').style.display='flex';
+  await applyScriptFilter();
+}
+
+// 根据选择框筛选可见场景；「全部」时显示所有脚本
+async function applyScriptFilter(){
+  const v=$('scriptSelect').value;
+  S.view = v ? S.items.filter(s=>s.scriptName===v) : S.items.slice();
+  if(S.view.length)await go(0);
 }
 
 async function go(i){
-  if(i<0||i>=S.items.length)return;
+  if(i<0||i>=S.view.length)return;
   S.idx=i;S.sel=null;
-  const it=S.items[i];
+  const it=S.view[i];
   lbl.textContent=it.id;
   const orientLabel=it.orient==='h'?'H':(it.orient==='v'?'V':it.orient);
   const sd=sceneDims(it.orient);
-  pos.textContent=(i+1)+' / '+S.items.length+'  '+orientLabel+'  ('+it.prefix+')  '+sd.w+'×'+sd.h;
-  $('btnPrev').disabled=i===0;$('btnNext').disabled=i>=S.items.length-1;
+  pos.textContent=(i+1)+' / '+S.view.length+'  '+orientLabel+'  ('+it.prefix+')  '+sd.w+'×'+sd.h;
+  $('btnPrev').disabled=i===0;$('btnNext').disabled=i>=S.view.length-1;
   await loadData();
 }
 
 async function loadData(){
-  const it=S.items[S.idx];if(!it)return;
+  const it=S.view[S.idx];if(!it)return;
   const sd=sceneDims(it.orient);
   const ic=$('image-container');
   ic.style.width=sd.w+'px';ic.style.height=sd.h+'px';
@@ -307,7 +312,7 @@ function del(key){
 }
 
 async function save(){
-  const it=S.items[S.idx];if(!it)return;
+  const it=S.view[S.idx];if(!it)return;
   const r=await fetch('/api/scene/'+it.id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({marks:S.marks})});
   if(r.ok){setChg(0);tst('Saved')}else tst('Save failed!',1)
 }

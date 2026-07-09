@@ -5,16 +5,17 @@ import * as lib from '../lib_3d_viewer_web.mjs'
 
 
 const subtitle = `
-最后经过几轮对话，这个问题真的解决了
-现在来欣赏一下最终的成果
-一共有两种动画，这是第一个
-演示中间的太阳轮固定
-外层的齿圈驱动三个行星轮转动
+这是第二个动画
+演示外层齿圈固定
+太阳轮驱动行星轮转动
+两个动画中，行星轮不仅有自转，还有公转（移动）
+这两个动画比看起来要难
 `;
+
 
 lib.makeMovie(
   import.meta.url,
-  "res/gear1.glb",
+  "res/gear2.glb",
   {
     AutoRotate: '0',
     closeRightPanel: '0;1',
@@ -28,7 +29,6 @@ lib.makeMovie(
     // 模型绕 X 轴旋转 45°，使齿轮圆盘在屏幕上平放
     await lib.rotateModel(page, 45, 2000, { axis: [1, 0, 0] })
     await page.waitForTimeout(1000)
-    await lib.captureCover(page)
 
 
     // 播放 faicad_motion 扩展动画（行星齿轮组运动），速度减半，只播放一遍

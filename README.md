@@ -200,7 +200,7 @@ makeMovie(
     // e.g. GSAP zoom-out: 2s 拉远到 1.5x 距离
     await page.evaluate(() => {
       return new Promise((resolve) => {
-        const dev = window.__r3f_dev
+        const dev = window.__engine_dev
         const cam = dev.controls.object
         const center = dev.controls.target.clone()
         const dir = cam.position.clone().sub(center).normalize()
@@ -916,7 +916,7 @@ FFmpeg filter 语法中 `:` 是选项分隔符。`C:/path/file.ass` 会被解析
 | 作用 | API |
 |------|-----|
 | 检测模型加载 | `window.__modelStore.getState().loadedFiles.length >= 1` |
-| 相机控制 | `window.__r3f_dev.camera.position / controls` |
+| 相机控制 | `window.__engine_dev.camera.position / controls` |
 | 入场动画 | 模型加载完成后自动播放（`handleModelLoaded`），参数由 URL `entryAnim=zoom\|slide\|auto` + `entryDuration=<ms>` + `entryDir=top\|bottom\|left\|right` 控制 |
 | GSAP 动画（通用） | `window.__gsap.to(camera.position, { duration: 2, ease: 'power2.inOut', onUpdate, onComplete })` |
 | GSAP zoom-out（拉远） | `cam.position → center + direction × distance × 1.5`，`gsap.to(cam.position, { duration: 2 })` |

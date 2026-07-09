@@ -5,16 +5,21 @@ import * as lib from '../lib_3d_viewer_web.mjs'
 
 
 const subtitle = `
-最后经过几轮对话，这个问题真的解决了
-现在来欣赏一下最终的成果
-一共有两种动画，这是第一个
-演示中间的太阳轮固定
-外层的齿圈驱动三个行星轮转动
+大部分网上的行星齿轮组动画
+行星轮是被支架固定住的，只有自转没有公转的
+完成这样一个行星齿轮组的建模、装配和动画
+使用传统的CAD软件
+至少要半个小时以上
+能力差的很可能还完不成任务
+而我写这套系统
+只需要一句话就能完成整个建模和动画了
+关注我,了解更多进展
 `;
+
 
 lib.makeMovie(
   import.meta.url,
-  "res/gear1.glb",
+  "res/gear3.glb",
   {
     AutoRotate: '0',
     closeRightPanel: '0;1',
@@ -25,11 +30,12 @@ lib.makeMovie(
     entryTargetShiftY: '0.1',
   },
   async (page, suffix, tPageOpen) => {
-    // 模型绕 X 轴旋转 45°，使齿轮圆盘在屏幕上平放
-    await lib.rotateModel(page, 45, 2000, { axis: [1, 0, 0] })
     await page.waitForTimeout(1000)
-    await lib.captureCover(page)
-
+    // 模型绕 X 轴旋转 45°，使齿轮圆盘在屏幕上平放
+    await lib.rotateModel(page, 180, 6000, { axis: [-1, 0, 0] })
+    await page.waitForTimeout(1000)
+    await lib.rotateModel(page, 180-45, 6000, { axis: [-1, 0, 0] })
+    await page.waitForTimeout(500)
 
     // 播放 faicad_motion 扩展动画（行星齿轮组运动），速度减半，只播放一遍
     await page.evaluate(() => {
@@ -40,9 +46,17 @@ lib.makeMovie(
         ctrl.play()
       }
     })
+    await page.waitForTimeout(10000)
 
-    // lib.animateCamera(page, { rotate: 'y', angle: 180, duration: 4000, ease: 'none' })
-    // await page.waitForTimeout(4000)
+    // await page.evaluate(() => {
+    //   const ctrl = window.__faicadMotionController
+    //   if (ctrl) {
+    //     ctrl.setSpeed(0.1)
+    //     ctrl._tween.repeat(0)
+    //     ctrl.play()
+    //   }
+    // })
+
 
   },
 )

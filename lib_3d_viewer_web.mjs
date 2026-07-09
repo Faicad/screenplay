@@ -38,7 +38,14 @@ import {
 export let majorAxis = 'x'
 export let minorAxis = 'y'
 
-const VIEWER_PORT = 4178
+const PREFERRED_VIEWER_PORT = 4178
+const HOST = '127.0.0.1'
+
+// Actual ports chosen at runtime; they may differ from the preferred ports
+// when those are already occupied. Callers (movie scripts) never have to care
+// about this — URLs are always built from these runtime values.
+let viewerPort = PREFERRED_VIEWER_PORT
+let modelPort = MODEL_PORT
 
 function resolveWebRoot() {
   const configured = process.env['3D_VIEWER_WEB_ROOT']
@@ -76,7 +83,7 @@ export async function startRecording(page, tPageOpen, entryDuration) {
 }
 
 export async function loadModel(page, modelPath, opts = {}, timeout = 10000) {
-  const url = `http://localhost:${MODEL_PORT}/${modelPath}`
+  const url = `http://${HOST}:${modelPort}/${modelPath}`
   const resolved = {}
   let resetCanvas = true
   for (const [k, v] of Object.entries(opts)) {
@@ -186,7 +193,7 @@ export async function unloadModel(page, target, opts = {}) {
   })
 }
 
-export async function recordOne(browser, viewerUrl, viewport, suffix, pageFn, recordDir, entryDuration, modelBuffer, hdrBuffers, ttsTiming) {
+export async function recordOne(browser, viewerUrl, viewport, suffix, pageFn, recordDir, entryDuration, modelBuffer, hdrBuffers, ttsTiming, closeRightPanel) {
   const context = await browser.newContext({
     viewport,
     recordVideo: { dir: recordDir, size: viewport },
@@ -233,6 +240,12 @@ export async function recordOne(browser, viewerUrl, viewport, suffix, pageFn, re
 
   await page.waitForSelector('canvas', { timeout: 20000 })
   await page.waitForFunction(() => typeof (window).__modelStore?.getState === 'function', { timeout: 15000 })
+
+  if (closeRightPanel === '1' || closeRightPanel === 'true' || closeRightPanel === true) {
+    await page.evaluate(() => {
+      window.__uiStore?.setState?.({ rightPanelOpen: false })
+    })
+  }
 
   const tPageFn = Date.now()
   const { trimStart, tModelBrowser } = await startRecording(page, tPageOpen, entryDuration)
@@ -326,12 +339,14 @@ export async function makeMovie(scriptUrl, modelPath, viewerParams, pageFn, outp
     }
   }
 
-  const viewerServer = await createStaticServer(distDir, VIEWER_PORT)
+  const viewerServer = await createStaticServer(distDir, PREFERRED_VIEWER_PORT)
+  viewerPort = viewerServer.port
   // Models resolve relative to the screenplay project root (screenplayDir),
   // not the 3d_viewer_web root — model assets (e.g. p2/*.stl) live alongside scripts.
   const modelServer = await createStaticServer(screenplayDir, MODEL_PORT)
+  modelPort = modelServer.port
 
-  const MODEL_URL = `http://localhost:${MODEL_PORT}/${modelPath}`
+  const MODEL_URL = `http://${HOST}:${modelPort}/${modelPath}`
   console.log(`Model:  ${MODEL_URL}`)
 
   const preset = resolveSizePreset()
@@ -344,7 +359,7 @@ export async function makeMovie(scriptUrl, modelPath, viewerParams, pageFn, outp
   if (existsSync(moviesRoot)) {
     for (const f of readdirSync(moviesRoot)) {
       if (f.endsWith(`${hdrSuffix}.hdr`)) {
-        const url = `http://localhost:${MODEL_PORT}/${f}`
+        const url = `http://${HOST}:${modelPort}/${f}`
         hdrBuffers.set(url, readFileSync(join(moviesRoot, f)))
       }
     }
@@ -371,7 +386,7 @@ export async function makeMovie(scriptUrl, modelPath, viewerParams, pageFn, outp
       if (animType === 'slide' && !explicitDir) {
         warmParams.set('entryDir', isLandscape ? 'left' : 'top')
       }
-      const warmUrl = `http://localhost:${VIEWER_PORT}/#/workspace?${warmParams.toString()}`
+      const warmUrl = `http://${HOST}:${viewerPort}/#/workspace?${warmParams.toString()}`
       console.log(`[warmup] ${suffix} ${width}×${height}: warming up cache and WebGL...`)
       const warmCtx = await browser.newContext({ viewport: { width, height } })
       const warmPage = await warmCtx.newPage()
@@ -395,10 +410,10 @@ export async function makeMovie(scriptUrl, modelPath, viewerParams, pageFn, outp
       params.set('entryDir', isLandscape ? 'left' : 'top')
     }
     const resolvedEntryDuration = resolvedParams.entryDuration ? parseInt(resolvedParams.entryDuration, 10) : 2000
-    const viewerUrl = `http://localhost:${VIEWER_PORT}/#/workspace?${params.toString()}`
+    const viewerUrl = `http://${HOST}:${viewerPort}/#/workspace?${params.toString()}`
     console.log(`[${suffix}] Viewer: ${viewerUrl}`)
     try {
-      const result = await recordOne(browser, viewerUrl, { width, height }, suffix, pageFn, outDir, resolvedEntryDuration, modelBuffer, hdrBuffers, ttsTiming)
+      const result = await recordOne(browser, viewerUrl, { width, height }, suffix, pageFn, outDir, resolvedEntryDuration, modelBuffer, hdrBuffers, ttsTiming, resolvedParams.closeRightPanel)
       result.suffix = suffix
       results.push(result)
     } catch (err) {
@@ -409,8 +424,8 @@ export async function makeMovie(scriptUrl, modelPath, viewerParams, pageFn, outp
   }
 
   await browser.close()
-  viewerServer.close()
-  modelServer.close()
+  viewerServer.server.close()
+  modelServer.server.close()
 
   const allSyncpoints = results[0]?.syncpoints || []
   if (allSyncpoints.length > 0) {
@@ -457,8 +472,8 @@ export async function makeMovie(scriptUrl, modelPath, viewerParams, pageFn, outp
   console.log('Done!')
 }
 
-function createStaticServer(root, port) {
-  return new Promise((resolve) => {
+function createStaticServer(root, preferredPort) {
+  return new Promise((resolve, reject) => {
     const server = createServer((req, res) => {
       const urlPath = req.url.split('?')[0]
       const filePath = join(root, urlPath === '/' ? 'index.html' : urlPath)
@@ -480,7 +495,7 @@ function createStaticServer(root, port) {
           const dir = dirname(filePath)
           if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
           writeFileSync(filePath, Buffer.concat(chunks))
-          const url = `http://localhost:${port}${urlPath}`
+          const url = `http://${HOST}:${actualPort}${urlPath}`
           res.writeHead(200, {
             'Content-Type': 'application/json',
             'Access-Control-Allow-Origin': '*',
@@ -514,6 +529,28 @@ function createStaticServer(root, port) {
       })
       res.end(readFileSync(filePath))
     })
-    server.listen(port, () => resolve(server))
+
+    // Bind to 127.0.0.1 only and scan upward for a free port. This avoids the
+    // dual-stack trap where a stale server on [::1] can coexist with a server
+    // bound to ::, causing Chromium (resolving localhost → ::1) to hit the
+    // wrong server. Scanning from `preferredPort` upward means callers never
+    // have to pick or know the actual port.
+    let actualPort = preferredPort
+    const maxPort = preferredPort + 200
+    const onError = (err) => {
+      server.removeListener('error', onError)
+      if (err.code === 'EADDRINUSE' && actualPort < maxPort) {
+        actualPort++
+        server.on('error', onError)
+        server.listen(actualPort, HOST)
+      } else {
+        reject(err)
+      }
+    }
+    server.on('error', onError)
+    server.listen(actualPort, HOST, () => {
+      server.removeListener('error', onError)
+      resolve({ server, port: actualPort })
+    })
   })
 }

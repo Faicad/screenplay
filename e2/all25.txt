@@ -28,20 +28,17 @@ Faicad开源的3D查看器，支持支持25种3D文件格式
 
   ├── OpenSCAD             → SCAD (Parametric Model Maker)
   ├── Open3DGC / assimp    → 3DS, OBJ, PLY, AMF
-
-
+  ├── Rhino SDK            → 3DM / Studio3
 IGES, STPZ, BREP
+  ├── FreeCAD / OCC        → FCStd
 
 
 服务端接收 → 路由到对应解析引擎
   │
-  ├── OpenCASCADE          → STEP, STP, IGES, STPZ, BREP
   ├── AutoCAD SDK / Teigha → DWG, DXF
   ├── SolidWorks SDK       → SLDPRT, SLDASM
   ├── Fusion 360 API       → F3D
   ├── SketchUp SDK         → SKP
-  ├── FreeCAD / OCC        → FCStd
-  ├── Rhino SDK            → 3DM / Studio3
   ├── SOLVESPACE SDK       → SLVS
   └── Shapr3D SDK          → SHAPR
 

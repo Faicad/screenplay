@@ -156,7 +156,7 @@ handleModelLoaded(box)
 
 ```
 window.__triggerEntryAnimation(opts?)
-  → 读取 modelBbox (engine store) + controls (__r3f_dev)
+  → 读取 modelBbox (engine store) + controls (__engine_dev)
   → 解析 cfg = opts ?? URL params ?? 系统默认
   → type === 'auto':
        animateCamera (当前位置 → fit 位置)

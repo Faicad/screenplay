@@ -284,7 +284,7 @@ export function rotateModel(page, degrees, duration, opts = {}) {
       axis = up === 'z' ? [0, 0, 1] : [0, 1, 0]
     }
     // Compute model bounding box center from visible meshes
-    const dev = window.__r3f_dev
+    const dev = window.__engine_dev
     const box = new THREE.Box3()
     let hasGeom = false
     if (dev?.scene) {
@@ -297,19 +297,24 @@ export function rotateModel(page, degrees, duration, opts = {}) {
     }
     const center = hasGeom ? box.getCenter(new THREE.Vector3()) : new THREE.Vector3(0, 0, 0)
     const axisVec = new THREE.Vector3(axis[0], axis[1], axis[2])
-    const proxy = { angle: 0 }
+    // Read current model transform for cumulative rotation
+    const partProxy = api.getPartProxy('__model__')
+    const startPos = partProxy ? partProxy.position.clone() : new THREE.Vector3(0, 0, 0)
+    const startQ = partProxy ? partProxy.quaternion.clone() : new THREE.Quaternion()
+    const proxy = { t: 0 }
     return new Promise((resolve) => {
       gsap.to(proxy, {
-        angle: radians,
+        t: 1,
         duration: duration / 1000,
         ease,
         onUpdate: () => {
-          const q = new THREE.Quaternion().setFromAxisAngle(axisVec, proxy.angle)
-          // Rotate around model center: newPos = center + q * (0 - center) = center - q * center
-          const newPos = center.clone().sub(center.clone().applyQuaternion(q))
+          const deltaQ = new THREE.Quaternion().setFromAxisAngle(axisVec, proxy.t * radians)
+          const resultQ = deltaQ.clone().multiply(startQ)
+          const offset = startPos.clone().sub(center)
+          const newPos = center.clone().add(offset.applyQuaternion(deltaQ))
           api.setPartTransform('__model__', {
             position: [newPos.x, newPos.y, newPos.z],
-            quaternion: [q.x, q.y, q.z, q.w],
+            quaternion: [resultQ.x, resultQ.y, resultQ.z, resultQ.w],
           })
         },
         onComplete: resolve,
@@ -1037,8 +1042,8 @@ export async function moveModelToScreenNdc(page, ndcX, ndcY, duration, target) {
     const THREE = window.__THREE
     const gsap = window.__gsap
     const api = window.__viewerAPI
-    const camera = window.__r3f_dev?.camera
-    const controls = window.__r3f_dev?.controls
+    const camera = window.__engine_dev?.camera
+    const controls = window.__engine_dev?.controls
     if (!camera || !controls) return
 
     const center = controls.target.clone()
