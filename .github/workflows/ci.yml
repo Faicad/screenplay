@@ -60,4 +60,6 @@ jobs:
           echo "Electron binary: $EXE"
 
       - name: Run tests (with virtual display)
+        env:
+          DEFAULT_TTS: edge-tts
         run: xvfb-run --auto-servernum node run-tests.mjs
