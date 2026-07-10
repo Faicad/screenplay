@@ -52,16 +52,10 @@ jobs:
           pnpm install
           pnpm build:unpacked:linux
 
-      - name: Debug dist structure
-        run: |
-          ls -la ../3d_viewer_electron/dist/linux-unpacked/
-          file ../3d_viewer_electron/dist/linux-unpacked/3d_viewer_electron
-          ldd ../3d_viewer_electron/dist/linux-unpacked/3d_viewer_electron 2>&1 | head -20
-          ls -la ../3d_viewer_electron/dist/linux-unpacked/resources/
-
       - name: Set Electron env vars
         run: |
-          DIR=$(realpath ../3d_viewer_electron/dist/linux-unpacked)
+          ROOT=$(realpath ../3d_viewer_electron)
+          DIR="$ROOT/dist/linux-unpacked"
           if [ -d "$DIR" ]; then
             EXE=$(find "$DIR" -maxdepth 1 -type f -executable ! -name '*.so*' ! -name 'chrome-sandbox' 2>/dev/null | head -1)
             if [ -z "$EXE" ]; then
@@ -73,13 +67,10 @@ jobs:
             exit 1
           fi
           echo "ELECTRON_EXE=$EXE" >> "$GITHUB_ENV"
-          echo "3D_VIEWER_ELECTRON_ROOT=$(realpath ../3d_viewer_electron)" >> "$GITHUB_ENV"
+          # Write .env so env.mjs picks it up at module load time
+          echo "3D_VIEWER_ELECTRON_ROOT=$ROOT" >> .env
           echo "Electron binary: $EXE"
-
-      - name: Debug env propagation
-        run: |
-          echo "ENV check: 3D_VIEWER_ELECTRON_ROOT=$3D_VIEWER_ELECTRON_ROOT"
-          node -e "console.log('Node sees:', process.env['3D_VIEWER_ELECTRON_ROOT'])"
+          echo "Root: $ROOT"
 
       - name: Run tests (with virtual display)
         env:
