@@ -76,6 +76,11 @@ jobs:
           echo "3D_VIEWER_ELECTRON_ROOT=$(realpath ../3d_viewer_electron)" >> "$GITHUB_ENV"
           echo "Electron binary: $EXE"
 
+      - name: Debug env propagation
+        run: |
+          echo "ENV check: 3D_VIEWER_ELECTRON_ROOT=$3D_VIEWER_ELECTRON_ROOT"
+          node -e "console.log('Node sees:', process.env['3D_VIEWER_ELECTRON_ROOT'])"
+
       - name: Run tests (with virtual display)
         env:
           DEFAULT_TTS: edge-tts
