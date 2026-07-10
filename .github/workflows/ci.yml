@@ -61,11 +61,10 @@ jobs:
 
       - name: Set Electron env vars
         run: |
-          DIR=../3d_viewer_electron/dist/linux-unpacked
+          DIR=$(realpath ../3d_viewer_electron/dist/linux-unpacked)
           if [ -d "$DIR" ]; then
             EXE=$(find "$DIR" -maxdepth 1 -type f -executable ! -name '*.so*' ! -name 'chrome-sandbox' 2>/dev/null | head -1)
             if [ -z "$EXE" ]; then
-              # try subdirectories (electron-builder sometimes nests)
               EXE=$(find "$DIR" -type f -executable ! -name '*.so*' ! -name 'chrome-sandbox' 2>/dev/null | head -1)
             fi
           fi
@@ -74,7 +73,7 @@ jobs:
             exit 1
           fi
           echo "ELECTRON_EXE=$EXE" >> "$GITHUB_ENV"
-          echo "3D_VIEWER_ELECTRON_ROOT=${{ github.workspace }}/../3d_viewer_electron" >> "$GITHUB_ENV"
+          echo "3D_VIEWER_ELECTRON_ROOT=$(realpath ../3d_viewer_electron)" >> "$GITHUB_ENV"
           echo "Electron binary: $EXE"
 
       - name: Run tests (with virtual display)
