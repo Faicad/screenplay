@@ -53,7 +53,11 @@ jobs:
           pnpm build:unpacked:linux
 
       - name: Debug dist structure
-        run: ls -laR ../3d_viewer_electron/dist/linux-unpacked/ | head -40
+        run: |
+          ls -la ../3d_viewer_electron/dist/linux-unpacked/
+          file ../3d_viewer_electron/dist/linux-unpacked/3d_viewer_electron
+          ldd ../3d_viewer_electron/dist/linux-unpacked/3d_viewer_electron 2>&1 | head -20
+          ls -la ../3d_viewer_electron/dist/linux-unpacked/resources/
 
       - name: Set Electron env vars
         run: |
