@@ -8,6 +8,7 @@ import { createServer } from 'http'
 import { readFileSync, writeFileSync, existsSync, mkdirSync, rmSync, renameSync, statSync, readdirSync } from 'fs'
 import { join, extname, dirname, basename, relative, resolve } from 'path'
 import { fileURLToPath } from 'url'
+import { loadProjectEnv } from './env.mjs'
 import { spawnSync } from 'child_process'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -300,11 +301,12 @@ function resolveOrientParams(params, isLandscape) {
 
 export async function makeMovie(scriptUrl, modelPath, viewerParams, pageFn, outputDir) {
   const scriptName = basename(fileURLToPath(scriptUrl), '.mjs')
-  const outDir = outputDir || join(dirname(fileURLToPath(scriptUrl)), 'gen')
+  const scriptPath = fileURLToPath(scriptUrl)
+  const outDir = outputDir || join(dirname(scriptPath), 'gen')
+  loadProjectEnv(scriptPath)
   setGenContext(outDir, scriptName)
   mkdirSync(outDir, { recursive: true })
 
-  const scriptPath = fileURLToPath(scriptUrl)
   const ttsTimingPath = join(outDir, `${scriptName}.tts-timing.json`)
   const forceTts = process.argv.slice(2).includes('-f') || process.argv.slice(2).includes('--force')
   const ttsProvider = resolveTtsProvider()

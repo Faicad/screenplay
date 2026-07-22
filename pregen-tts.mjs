@@ -19,7 +19,7 @@ import {
   parseSubtitleLines, splitBySyncpoints, countSyncpointsInScript,
   generateTtsSegment, probeDuration, cleanTtsText, normalizeSparkTtsText,
   parseVoicePrefix, ttsCacheKey,
-  INITIAL_GAP, INTER_LINE_GAP, DEFAULT_TTS_PROVIDER, DEFAULT_VOICE,
+  INITIAL_GAP, INTER_LINE_GAP, getDefaultTtsProvider, DEFAULT_VOICE,
 } from './generate-subtitle.mjs'
 import { loadProjectEnv } from './env.mjs'
 
@@ -122,7 +122,7 @@ async function pregenTts(scriptPath, { force = false, ttsProvider } = {}) {
       }
 
       const { voice, text } = parseVoicePrefix(rawText)
-      const effectiveProvider = voice ? 'edge-tts' : (ttsProvider || DEFAULT_TTS_PROVIDER)
+      const effectiveProvider = voice ? 'edge-tts' : (ttsProvider || getDefaultTtsProvider())
       const usedVoice = effectiveProvider === 'edge-tts' ? (voice || DEFAULT_VOICE) : effectiveProvider
 
       let configStr

@@ -12,15 +12,19 @@ const __dir = dirname(fileURLToPath(import.meta.url))
 const INITIAL_GAP = 0.5     // silence before first line (s)
 const INTER_LINE_GAP = 0.15 // silence between lines (s) — both audio gap and subtitle gap
 const DEFAULT_VOICE = 'zh-CN-XiaoxiaoNeural'
-const DEFAULT_TTS_PROVIDER = process.env.DEFAULT_TTS || 'spark-tts'
+// Runtime functions — read process.env at call time, so per-project .env
+// (loaded via loadProjectEnv) can override root .env values.
+export function getDefaultTtsProvider() {
+  return process.env.DEFAULT_TTS || 'spark-tts'
+}
 
 // Comma-separated list of TTS providers that get karaoke word-highlight subtitles.
 // Not set or empty → no karaoke. Example: KARAOKE_TTS_PROVIDERS=edge-tts
-const KARAOKE_PROVIDERS = (() => {
+export function getKaraokeProviders() {
   const raw = process.env.KARAOKE_TTS_PROVIDERS
   if (!raw) return []
   return raw.split(',').map(s => s.trim()).filter(Boolean)
-})()
+}
 
 
 // edge-tts --list-voices | rg zh-CN
@@ -243,7 +247,7 @@ function scriptHasImageConfig(scriptPath) {
   return /(?:^|\n)const\s+image_config\s*=/.test(src)
 }
 
-async function generateTtsSegment(text, outPath, voice = DEFAULT_VOICE, ttsProvider = DEFAULT_TTS_PROVIDER) {
+async function generateTtsSegment(text, outPath, voice = DEFAULT_VOICE, ttsProvider = getDefaultTtsProvider()) {
   let ttsText = cleanTtsText(text)
   if (ttsProvider === 'spark-tts') {
     const normalized = normalizeSparkTtsText(ttsText)
@@ -431,7 +435,7 @@ function computeAudioTotal(segments) {
  *
  * @returns {{ segments, entries, videoDuration, imageDurations }}
  */
-async function generateSubtitle(scriptPath, { ttsProvider = DEFAULT_TTS_PROVIDER, force = false } = {}) {
+async function generateSubtitle(scriptPath, { ttsProvider = getDefaultTtsProvider(), force = false } = {}) {
   loadProjectEnv(scriptPath)
 
   const scriptDir = dirname(scriptPath)
@@ -607,7 +611,7 @@ async function generateSubtitle(scriptPath, { ttsProvider = DEFAULT_TTS_PROVIDER
       t: cleanDisplayText(seg.text),
     }
     const segProvider = seg.provider || 'edge-tts'  // fallback for legacy cache
-    if (seg.words && seg.words.length > 0 && KARAOKE_PROVIDERS.includes(segProvider)) {
+    if (seg.words && seg.words.length > 0 && getKaraokeProviders().includes(segProvider)) {
       e.words = seg.words
     }
     entries.push(e)
@@ -732,12 +736,12 @@ async function generateSubtitle(scriptPath, { ttsProvider = DEFAULT_TTS_PROVIDER
 }
 
 // ── Exports ──
-export { generateSubtitle, INITIAL_GAP, INTER_LINE_GAP, DEFAULT_TTS_PROVIDER, DEFAULT_VOICE, parseSubtitleLines, splitBySyncpoints, countSyncpointsInScript, probeDuration, generateTtsSegment, cleanTtsText, normalizeSparkTtsText, parseVoicePrefix, generateSilence, ttsCacheKey, scriptHasImage, scriptHasUrls, scriptHasImageConfig }
+export { generateSubtitle, INITIAL_GAP, INTER_LINE_GAP, DEFAULT_VOICE, parseSubtitleLines, splitBySyncpoints, countSyncpointsInScript, probeDuration, generateTtsSegment, cleanTtsText, normalizeSparkTtsText, parseVoicePrefix, generateSilence, ttsCacheKey, scriptHasImage, scriptHasUrls, scriptHasImageConfig }
 
 // ── CLI ──
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   let scriptPath = null
-  let ttsProvider = DEFAULT_TTS_PROVIDER
+  let ttsProvider = getDefaultTtsProvider()
   let force = false
   const args = process.argv.slice(2)
   for (let i = 0; i < args.length; i++) {
@@ -745,7 +749,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     if (arg === '-f' || arg === '--force') {
       force = true
     } else if (arg === '--tts') {
-      ttsProvider = args[++i] || DEFAULT_TTS_PROVIDER
+      ttsProvider = args[++i] || getDefaultTtsProvider()
     } else if (!scriptPath) {
       scriptPath = resolve(arg)
     }

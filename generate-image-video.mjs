@@ -3,7 +3,8 @@ import { resolve, dirname, basename, extname, join } from 'path'
 import { spawnSync } from 'child_process'
 import { pathToFileURL } from 'url'
 import * as lib from './lib-common.mjs'
-import { generateSubtitle, INITIAL_GAP, INTER_LINE_GAP, DEFAULT_TTS_PROVIDER } from './generate-subtitle.mjs'
+import { generateSubtitle, INITIAL_GAP, INTER_LINE_GAP, getDefaultTtsProvider } from './generate-subtitle.mjs'
+import { loadProjectEnv } from './env.mjs'
 
 function naturalCompare(a, b) {
   const split = (s) => (s.match(/(\d+|\D+)/g) || []).map(p => /^\d+$/.test(p) ? parseInt(p, 10) : p)
@@ -182,11 +183,12 @@ async function generateImageVideo(scriptPath) {
   console.log(`Image base: ${imageBase}`)
 
   mkdirSync(genDir, { recursive: true })
+  loadProjectEnv(scriptPath)
 
   const noTts = process.argv.slice(2).includes('--no-tts')
   const force = process.argv.slice(2).includes('-f') || process.argv.slice(2).includes('--force')
   const ttsArgIndex = process.argv.slice(2).indexOf('--tts')
-  const ttsProvider = ttsArgIndex >= 0 ? process.argv.slice(2)[ttsArgIndex + 1] : DEFAULT_TTS_PROVIDER
+  const ttsProvider = ttsArgIndex >= 0 ? process.argv.slice(2)[ttsArgIndex + 1] : getDefaultTtsProvider()
 
   let segments, imageDurations
 

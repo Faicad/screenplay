@@ -9,6 +9,7 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync, rmSync, renameSync,
 import { join, extname, dirname, basename, resolve } from 'path'
 import { fileURLToPath } from 'url'
 import { spawnSync } from 'child_process'
+import { loadProjectEnv } from './env.mjs'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 
@@ -343,6 +344,7 @@ export async function makeMovie(scriptUrl, modelPath, viewerParams, pageFn, outp
   const scriptPath = fileURLToPath(scriptUrl)
   const scriptName = basename(scriptPath, extname(scriptPath))
   const outDir = outputDir || join(dirname(scriptPath), 'gen')
+  loadProjectEnv(scriptPath)
   setGenContext(outDir, scriptName)
   mkdirSync(outDir, { recursive: true })
 

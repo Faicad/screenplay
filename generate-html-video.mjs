@@ -4,7 +4,8 @@ import { spawnSync } from 'child_process'
 import { pathToFileURL, fileURLToPath } from 'url'
 import { chromium } from 'playwright'
 import * as lib from './lib-common.mjs'
-import { generateSubtitle, parseSubtitleLines, INITIAL_GAP, INTER_LINE_GAP, DEFAULT_TTS_PROVIDER } from './generate-subtitle.mjs'
+import { generateSubtitle, parseSubtitleLines, INITIAL_GAP, INTER_LINE_GAP, getDefaultTtsProvider } from './generate-subtitle.mjs'
+import { loadProjectEnv } from './env.mjs'
 
 // ── Helpers (reused from generate-image-video.mjs) ──
 
@@ -84,11 +85,12 @@ async function generateHyperVideo(scriptPath) {
   console.log(`Script: ${basename(scriptPath)}`)
 
   mkdirSync(genDir, { recursive: true })
+  loadProjectEnv(scriptPath)
 
   const noTts = process.argv.slice(2).includes('--no-tts')
   const force = process.argv.slice(2).includes('-f') || process.argv.slice(2).includes('--force')
   const ttsArgIndex = process.argv.slice(2).indexOf('--tts')
-  const ttsProvider = ttsArgIndex >= 0 ? process.argv.slice(2)[ttsArgIndex + 1] : DEFAULT_TTS_PROVIDER
+  const ttsProvider = ttsArgIndex >= 0 ? process.argv.slice(2)[ttsArgIndex + 1] : getDefaultTtsProvider()
 
   // 1. Generate subtitle + audio
   let segments, imageDurations

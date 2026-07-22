@@ -4,12 +4,15 @@ import { spawnSync } from 'child_process'
 import { pathToFileURL } from 'url'
 import { chromium } from 'playwright'
 import * as lib from './lib-common.mjs'
-import { generateSubtitle, parseSubtitleLines, INITIAL_GAP, INTER_LINE_GAP, DEFAULT_TTS_PROVIDER } from './generate-subtitle.mjs'
+import { generateSubtitle, parseSubtitleLines, INITIAL_GAP, INTER_LINE_GAP, getDefaultTtsProvider } from './generate-subtitle.mjs'
 import { buildHtmlComposition, isMarkType, pad4 } from './html-composer.mjs'
+import { loadProjectEnv } from './env.mjs'
 
 const round2 = (v) => Math.round(v * 100) / 100
 
 export async function generateVideo(scriptPath, { urls, mode, onBeforeRecord }) {
+  loadProjectEnv(scriptPath)
+
   const scriptDir = dirname(scriptPath)
   const scriptName = basename(scriptPath, extname(scriptPath))
   const genDir = join(scriptDir, 'gen')
@@ -31,7 +34,7 @@ export async function generateVideo(scriptPath, { urls, mode, onBeforeRecord }) 
   const noTts = process.argv.slice(2).includes('--no-tts')
   const force = process.argv.slice(2).includes('-f') || process.argv.slice(2).includes('--force')
   const ttsArgIndex = process.argv.slice(2).indexOf('--tts')
-  const ttsProvider = ttsArgIndex >= 0 ? process.argv.slice(2)[ttsArgIndex + 1] : DEFAULT_TTS_PROVIDER
+  const ttsProvider = ttsArgIndex >= 0 ? process.argv.slice(2)[ttsArgIndex + 1] : getDefaultTtsProvider()
 
   let segments, imageDurations
 
