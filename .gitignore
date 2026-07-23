@@ -10,6 +10,7 @@ old
 skip*.mjs
 **/gen/*
 **/ai_gen/*.png
+**/*.png
 **/screenshot/*
 pretrained_models/*
 p*/*.stl
@@ -18,3 +19,4 @@ exported.stl
 __pycache__
 node_modules
 .workbuddy/
+**/idea*

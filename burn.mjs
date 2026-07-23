@@ -3,6 +3,7 @@ import { pathToFileURL, fileURLToPath } from 'url'
 import { dirname, join, basename, extname } from 'path'
 import { spawnSync } from 'child_process'
 import { burnVideo, screenplayDir } from './lib-common.mjs'
+import { loadProjectEnv } from './env.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -78,9 +79,10 @@ if (!isSceneScript && !isImageScript && !isUrlScript && !isImageConfigScript) {
 }
 
 // ── Step 3: Burn subtitles + audio into final video ──
-// URL scripts: burn already done inside generate-url-video.mjs.
-// Hyper/Image scripts: burn done here via burnVideo (generate-hyper/mage-video.mjs was called with --no-burn).
-if (!isUrlScript && !isImageConfigScript) {
-  console.log(`\n=== Burning subtitles: ${scriptName} ===`)
-  burnVideo(scriptUrl, genDir)
-}
+  // URL scripts: burn already done inside generate-url-video.mjs.
+  // Hyper/Image scripts: burn done here via burnVideo (generate-hyper/mage-video.mjs was called with --no-burn).
+  if (!isUrlScript && !isImageConfigScript) {
+    console.log(`\n=== Burning subtitles: ${scriptName} ===`)
+    loadProjectEnv(absPath)
+    burnVideo(scriptUrl, genDir)
+  }

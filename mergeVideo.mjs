@@ -4,6 +4,7 @@ import { pathToFileURL } from 'url'
 import { spawn, spawnSync } from 'child_process'
 import { DEFAULT_BGM, screenplayDir } from './lib-common.mjs'
 import { makeCoverClip } from './coverClip.mjs'
+import { loadDotEnv } from './env.mjs'
 
 /**
  * Probe video file for dimensions and frame rate.
@@ -289,8 +290,13 @@ function mergeProject(dirPath) {
   const mergeCfg = existsSync(mergeCfgPath)
     ? JSON.parse(readFileSync(mergeCfgPath, 'utf-8'))
     : {}
-  let bgmPath = mergeCfg.audioBg || DEFAULT_BGM
+
+  // Load per-project .env (e.g. e2/.env) to override root .env
+  loadDotEnv(join(absDir, '.env'))
+
+  let bgmPath = mergeCfg.audioBg || process.env.AUDIO_BG || DEFAULT_BGM
   if (mergeCfg.audioBg) console.log(`  BGM: ${mergeCfg.audioBg} (from merge.json)`)
+  else if (process.env.AUDIO_BG) console.log(`  BGM: ${process.env.AUDIO_BG} (from AUDIO_BG env)`)
 
   // ── Check force flag for merge's own cache ──
   const mergeForce = process.argv.slice(3).includes('-f') || process.argv.slice(3).includes('--force')

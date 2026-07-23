@@ -19,7 +19,7 @@ All paths produce `gen/{name}.subtitle` + `gen/{name}.mp3` + `gen/{name}_{h|v}.w
 |--------|------|
 | `lib.mjs` | Path A 脚手架：`makeMovie`, `startRecording`, `burnVideo`, `waitForModel`, `captureCover`, `syncpoint` |
 | `lib_gen_url_image.mjs` | Path D1/D2 共享流程：TTS/字幕/html-composer/Playwright 录制/ffmpeg/burn |
-| `burn.mjs` | 烧录字幕 + 音频 + bgm → `_burn_{h|v}.mp4` |
+| `burn.mjs` | 烧录字幕 + 音频 → `_burn_{h|v}.mp4`（不含背景音乐） |
 | `mergeVideo.mjs` | 多片段拼接 + 封面 + 烧录 → `merged_{h|v}.mp4` |
 | `generate-subtitle.mjs` | `.mjs` → TTS 逐行实测 → `.subtitle` + `.mp3` |
 | `pregen-tts.mjs` | TTS 预生成（仅生成缓存，供录制 syncpoint 使用） |
@@ -161,7 +161,7 @@ lib.makeMovie(
 
 | 函数 | 简介 |
 |------|------|
-| `burnVideo(scriptUrl, genDir)` | 按约定路径烧录字幕 + 音频 + BGM → `_burn_{h\|v}.mp4` |
+| `burnVideo(scriptUrl, genDir)` | 按约定路径烧录字幕 + 音频 → `_burn_{h\|v}.mp4`（不含背景音乐） |
 | `renderVideo(opts)` | 核心渲染：scale+pad + ASS 卡拉OK 字幕 + 混音 |
 
 #### 辅助/常量
@@ -285,7 +285,86 @@ const image_config = [
 - `const image_config` — Path D2，每项 `{ image, description, anim? }`（`anim` 可由 AI Agent 按 `description` 补全）
 - `const urls` — Path D1，每项 `{ url, description, anim? }`（`anim` 可由 AI Agent 按 `description` 补全）
 - `export function scene(...)` — Path C 手写动画
-- `merge.json` — 项目目录下可选配置：`{ "audioBg": "path/to/bgm.mp3" }`
+- `merge.json` — 项目目录下可选配置：`{ "audioBg": "path/to/bgm.mp3" }`（仅在 merge 时生效）
+
+## 背景音乐规则
+
+### 各阶段 BGM 策略
+
+| 阶段 | 是否有 BGM | 说明 |
+|------|-----------|------|
+| **burn**（单个视频烧录） | ❌ 无 | `burn.mjs` / `burnVideo()` 不混入任何背景音乐，`audioBg: null` |
+| **merge**（多片段拼接） | ✅ 有 | `mergeVideo.mjs` 统一混入 BGM，详见下方优先级 |
+
+### merge 时 BGM 优先级
+
+```js
+// mergeVideo.mjs
+let bgmPath = mergeCfg.audioBg || process.env.AUDIO_BG || DEFAULT_BGM
+```
+
+| 优先级 | 来源 | 示例 |
+|--------|------|------|
+| 1（最高） | 项目目录下 `merge.json` 的 `audioBg` 字段 | `{ "audioBg": "Jamvana - Pure Ocean.mp3" }` |
+| 2 | 根 `.env` 或项目 `.env` 的 `AUDIO_BG` | `AUDIO_BG=res/Jamvana - Pure Ocean.mp3` |
+| 3（最低） | `lib-common.mjs` 的 `DEFAULT_BGM` 常量 | `alex-productions-acoustic-folk-friends.wav` |
+
+## `.env` 层级规则
+
+项目支持两级 `.env` 覆盖，**项目级 `.env` 覆盖根级 `.env`**：
+
+```
+根目录 .env                  ← 全局默认值（加载最早）
+    └── 项目目录 .env        ← 项目级覆盖（加载在后，覆盖同名 key）
+```
+
+### 加载机制
+
+| 文件 | 加载方式 |
+|------|---------|
+| **`env.mjs`** | 模块级 `loadDotEnv(join(__dir, '.env'))` 加载根 `.env` |
+| **各入口脚本** | 在 main 函数中调用 `loadProjectEnv(scriptPath)` 加载项目 `.env` |
+
+**`loadDotEnv()` 使用 `process.env[key] = value` 直接赋值**，后加载的覆盖先加载的，无需 merge 逻辑。
+
+### 哪些入口已加载项目级 `.env`
+
+| 入口 | 是否调用 `loadProjectEnv` |
+|------|--------------------------|
+| `generate-image-video.mjs` | ✅ `loadProjectEnv(scriptPath)` |
+| `generate-html-video.mjs` | ✅ `loadProjectEnv(scriptPath)` |
+| `generate-url-video.mjs` | ✅ 通过 `lib_gen_url_image.mjs` |
+| `generate-image2-video.mjs` | ✅ 通过 `lib_gen_url_image.mjs` |
+| `generate-subtitle.mjs` | ✅ `loadProjectEnv(scriptPath)` |
+| `pregen-tts.mjs` | ✅ `loadProjectEnv(scriptPath)` |
+| `lib_3d_viewer_electron.mjs` | ✅ `loadProjectEnv(scriptPath)` |
+| `lib_3d_viewer_web.mjs` | ✅ `loadProjectEnv(scriptPath)` |
+| `burn.mjs` | ✅ `loadProjectEnv(absPath)`（在 `burnVideo()` 前调用） |
+| `mergeVideo.mjs` | ✅ `loadDotEnv(join(absDir, '.env'))`（在读取 `AUDIO_BG` 前调用） |
+
+### 示例
+
+```bash
+# 根 .env
+AUDIO_BG=res/default.mp3
+
+# e2/.env 覆盖根
+AUDIO_BG=res/e2_special.mp3
+
+# 运行 merge 时，e2 项目会读到 e2_special.mp3
+node mergeVideo.mjs e2
+```
+
+### 覆盖的变量
+
+当前支持在项目级 `.env` 中覆盖的变量：
+
+| 变量 | 用途 | 默认值 |
+|------|------|--------|
+| `DEFAULT_TTS` | TTS 引擎 | `spark-tts` |
+| `KARAOKE_TTS_PROVIDERS` | 卡拉OK TTS 引擎列表 | 无 |
+| `AUDIO_BG` | 背景音乐路径（仅 merge 时生效） | 无 |
+| `SPARKTTS_VOICE` | Spark-TTS 音色 | 无 |
 
 ## Rules & Common Pitfalls
 

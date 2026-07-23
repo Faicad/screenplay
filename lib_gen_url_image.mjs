@@ -226,14 +226,12 @@ export async function generateVideo(scriptPath, { urls, mode, onBeforeRecord }) 
       const output = join(genDir, `${scriptName}_burn${suffix}.mp4`)
       const { width: targetW, height: targetH } = orientations.find(o => o.suffix === suffix) || { width: 1920, height: 1080 }
       const targetFps = lib.resolve30fps() ? 30 : 25
-      const useDefaultBg = process.argv.slice(2).includes('--default-bg')
-      const audioBg = useDefaultBg ? lib.DEFAULT_BGM : null
 
       console.log(`  ${suffix} → ${basename(output)}`)
       lib.renderVideo({
         clips: [clip],
         audioVoice,
-        audioBg: audioBg ? audioBg : null,
+        audioBg: null,
         output,
         subtitlePath: existsSync(subtitlePath) ? subtitlePath : null,
         targetW, targetH, fps: targetFps,

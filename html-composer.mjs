@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync, copyFileSync, rmSync } from 'fs'
-import { join, dirname, basename } from 'path'
+import { join, dirname, basename, extname } from 'path'
 import { fileURLToPath } from 'url'
 
 const GSAP_SRC = join(dirname(fileURLToPath(import.meta.url)), 'templates', 'gsap.min.js')
@@ -93,11 +93,20 @@ export function buildHtmlComposition({ urls, marks, segments, imageDurations, ge
     for (let ai = 0; ai < (g.anims || []).length; ai++) {
       const step = g.anims[ai]
       if (step.type === 'overlay-image' && step.image) {
-        const srcPath = join(scriptDir, step.image)
+        // Try suffixed path first (e.g. screenshot/3d_viewer_h.png), then plain
+        const ext = extname(step.image)
+        const base = step.image.slice(0, -ext.length)
+        const suffixed = `${base}${suffix}${ext}`
+        const srcPath = join(scriptDir, suffixed)
         if (existsSync(srcPath)) {
           copyFileSync(srcPath, join(hfDir, `overlay_${sceneIdx}_${ai}.png`))
         } else {
-          console.warn(`  WARN: overlay image not found: ${srcPath}`)
+          const plainPath = join(scriptDir, step.image)
+          if (existsSync(plainPath)) {
+            copyFileSync(plainPath, join(hfDir, `overlay_${sceneIdx}_${ai}.png`))
+          } else {
+            console.warn(`  WARN: overlay image not found: ${suffixed} (also tried ${step.image})`)
+          }
         }
       }
     }
@@ -198,7 +207,7 @@ export function buildHtmlComposition({ urls, marks, segments, imageDurations, ge
     /* Arrow on top edge — annotation below target, arrow points up */
     .text-annotation.bottom::after{bottom:100%;left:50%;transform:translateX(-50%);border-bottom-color:#ff6b35}
     .caption{position:absolute;font-weight:bold;font-family:'Microsoft YaHei','PingFang SC',sans-serif;text-shadow:0 4px 20px rgba(0,0,0,.95);white-space:nowrap;pointer-events:none}
-    .overlay-image{position:absolute;pointer-events:none;opacity:0;-webkit-mask-image:radial-gradient(ellipse,black 65%,transparent 100%);mask-image:radial-gradient(ellipse,black 65%,transparent 100%)}
+    .overlay-image{position:absolute;pointer-events:none;opacity:0}
     .cursor-overlay{position:absolute;pointer-events:none;z-index:100}
     .cursor-pointer{width:32px;height:32px;background:radial-gradient(circle,#fff 2px,#000 2px,#000 4px,transparent 4px);border-radius:50%;position:absolute}
     .move-cursor{width:48px;height:60px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 40'%3E%3Cpath d='M0 0 L0 32 L8 24 L16 36 L20 34 L12 22 L28 22 Z' fill='white' stroke='%23222' stroke-width='2.5' stroke-linejoin='round'/%3E%3C/svg%3E");background-size:contain;background-repeat:no-repeat;position:absolute;pointer-events:none;filter:drop-shadow(1px 2px 3px rgba(0,0,0,0.5))}
@@ -298,7 +307,9 @@ function injectAutoScroll(anims, marks, viewportHeight) {
 function buildSceneHtml(scene, marks, index, width, height) {
   // Scroll layer contains bg + mark-dependent overlays (move together on scroll).
   // Centered text stays in scene (viewport-relative, unaffected by scroll).
-  let scrollHtml = `<div class="scroll-layer" id="scroll${index}">`
+  const hasZoomIn = (scene.anim || []).some(a => a.type === 'zoom-in')
+  const zoomStyle = hasZoomIn ? 'transform:scale(0.01);opacity:0;transform-origin:center center;' : ''
+  let scrollHtml = `<div class="scroll-layer" id="scroll${index}" style="${zoomStyle}">`
   scrollHtml += `<img class="scene-bg" id="bg${index}" src="bg_${index}.png">`
 
   let sceneExtras = ''
@@ -309,7 +320,7 @@ function buildSceneHtml(scene, marks, index, width, height) {
     // Non-mark types: no mark lookup needed
     if (!isMarkType(step.type)) {
       if (step.type === 'caption') {
-        const splitParts = splitCaptionText(step.text)
+        const splitParts = step.split || splitCaptionText(step.text)
         const style = captionStyle(step, width, height)
         if (splitParts.length > 1) {
           // One div, full text as layout anchor. Spans for progressive reveal — layout never shifts.
@@ -323,20 +334,25 @@ function buildSceneHtml(scene, marks, index, width, height) {
           sceneExtras += `<div class="caption" id="s${index}_c${ai}" style="${style};opacity:0">${step.text}</div>`
         }
       } else if (step.type === 'overlay-image') {
-        const ovW = step.width || 300
-        const ovH = step.height || 300
-        const pos = step.position || 'bottom-center'
-        const isLandscape = width > height
-        let posStyle
-        if (pos === 'bottom-center') {
-          posStyle = 'left:50%;bottom:0;transform:translateX(-50%)'
-        } else if (pos === 'center') {
-          const topPx = step.top != null ? hv(step.top, isLandscape) : 0
-          posStyle = `left:50%;top:calc(50% + ${topPx}px);transform:translate(-50%,-50%)`
+        if (step.zoomIn) {
+          // 全屏叠加图片，从极小点放大
+          sceneExtras += `<img class="overlay-image" id="s${index}_overlay${ai}" src="overlay_${index}_${ai}.png" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:contain;transform:scale(0.01);transform-origin:center center;opacity:0">`
         } else {
-          posStyle = 'top:0;left:0'
+          const ovW = step.width || 300
+          const ovH = step.height || 300
+          const pos = step.position || 'bottom-center'
+          const isLandscape = width > height
+          let posStyle
+          if (pos === 'bottom-center') {
+            posStyle = 'left:50%;bottom:0;transform:translateX(-50%)'
+          } else if (pos === 'center') {
+            const topPx = step.top != null ? hv(step.top, isLandscape) : 0
+            posStyle = `left:50%;top:calc(50% + ${topPx}px);transform:translate(-50%,-50%)`
+          } else {
+            posStyle = 'top:0;left:0'
+          }
+          sceneExtras += `<img class="overlay-image" id="s${index}_overlay${ai}" src="overlay_${index}_${ai}.png" style="width:${ovW}px;height:${ovH}px;${posStyle}">`
         }
-        sceneExtras += `<img class="overlay-image" id="s${index}_overlay${ai}" src="overlay_${index}_${ai}.png" style="width:${ovW}px;height:${ovH}px;${posStyle}">`
       }
       continue
     }
@@ -361,7 +377,8 @@ function buildSceneHtml(scene, marks, index, width, height) {
     if (step.type === 'highlight-area') {
       const pad = step.padding || 20
       const color = step.color || '#ff6b35'
-      scrollHtml += `<div class="overlay highlight-box" id="s${index}_area${ai}" style="left:${mark.x - pad}px;top:${fy - pad}px;width:${mark.w + pad * 2}px;height:${mark.h + pad * 2}px;opacity:0;border:3px solid ${color};box-shadow:0 0 20px ${color}80"></div>`
+      const borderWidth = step.borderWidth || 3
+      scrollHtml += `<div class="overlay highlight-box" id="s${index}_area${ai}" style="left:${mark.x - pad}px;top:${fy - pad}px;width:${mark.w + pad * 2}px;height:${mark.h + pad * 2}px;opacity:0;border:${borderWidth}px solid ${color};box-shadow:0 0 20px ${color}80"></div>`
     }
     if (step.type === 'text-annotation') {
       const pos = step.position || 'top-right'
@@ -432,7 +449,7 @@ function buildSceneGsap(scene, marks, sceneIndex, sceneStart, sceneDuration, wid
 
     // caption: ONE div (full text = layout anchor), spans control progressive reveal
     if (step.type === 'caption') {
-      const splitParts = splitCaptionText(step.text)
+      const splitParts = step.split || splitCaptionText(step.text)
       const absT = t.toFixed(3)
       chunks.push(`  tl.to('#s${sceneIndex}_c${ai}', {opacity:1,duration:0.3}, ${absT});`)
       if (splitParts.length > 1) {
@@ -496,9 +513,27 @@ function buildSceneGsap(scene, marks, sceneIndex, sceneStart, sceneDuration, wid
       }
       case 'highlight-area': {
         if (mark) {
-          const ms = step.highlightMs || 1500
-          chunks.push(`  tl.to('#s${sceneIndex}_area${ai}', {opacity:1,duration:0.3}, ${t.toFixed(3)});`)
-          chunks.push(`  tl.to('#s${sceneIndex}_area${ai}', {opacity:0,duration:0.5}, ${(t + ms / 1000).toFixed(3)});`)
+          const flashCount = step.flashCount || 0
+          const holdDuration = step.holdDuration || 0
+          if (flashCount > 0) {
+            // Flash N times then hold
+            let cursor = 0
+            for (let f = 0; f < flashCount; f++) {
+              chunks.push(`  tl.to('#s${sceneIndex}_area${ai}', {opacity:1,duration:0.5}, ${(t + cursor).toFixed(3)});`)
+              cursor += 0.5
+              chunks.push(`  tl.to('#s${sceneIndex}_area${ai}', {opacity:0,duration:0.5}, ${(t + cursor).toFixed(3)});`)
+              cursor += 0.5
+            }
+            // Hold at opacity 1 after flashing
+            chunks.push(`  tl.to('#s${sceneIndex}_area${ai}', {opacity:1,duration:0.1}, ${(t + cursor).toFixed(3)});`)
+            if (holdDuration > 0) {
+              chunks.push(`  tl.to('#s${sceneIndex}_area${ai}', {opacity:0,duration:0.5}, ${(t + cursor + holdDuration).toFixed(3)});`)
+            }
+          } else {
+            const ms = step.highlightMs || 1500
+            chunks.push(`  tl.to('#s${sceneIndex}_area${ai}', {opacity:1,duration:0.3}, ${t.toFixed(3)});`)
+            chunks.push(`  tl.to('#s${sceneIndex}_area${ai}', {opacity:0,duration:0.5}, ${(t + ms / 1000).toFixed(3)});`)
+          }
         }
         break
       }
@@ -517,7 +552,13 @@ function buildSceneGsap(scene, marks, sceneIndex, sceneStart, sceneDuration, wid
         break
       }
       case 'overlay-image': {
-        chunks.push(`  tl.to('#s${sceneIndex}_overlay${ai}', {opacity:1,duration:0.3}, ${t.toFixed(3)});`)
+        const fadeDur = step.duration != null ? step.duration : 0.3
+        if (step.zoomIn) {
+          const easeVal = step.ease || 'power2.out'
+          chunks.push(`  tl.to('#s${sceneIndex}_overlay${ai}', {opacity:1,scale:1,duration:${fadeDur.toFixed(3)},ease:'${easeVal}',transformOrigin:'center center'}, ${t.toFixed(3)});`)
+        } else {
+          chunks.push(`  tl.to('#s${sceneIndex}_overlay${ai}', {opacity:1,duration:${fadeDur.toFixed(3)}}, ${t.toFixed(3)});`)
+        }
         break
       }
       case 'custom': {

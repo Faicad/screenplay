@@ -3,6 +3,7 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync, rmSync, renameSync,
 import { join, extname, dirname, basename, relative, resolve } from 'path'
 import { fileURLToPath } from 'url'
 import { spawnSync } from 'child_process'
+import './env.mjs'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 export const screenplayDir = __dirname
@@ -1583,8 +1584,6 @@ export function burnVideo(scriptUrl, genDir) {
   const scriptDir = dirname(fileURLToPath(scriptUrl))
   const cwd = process.cwd()
   const rel = (p) => relative(cwd, p).replace(/\\/g, '/')
-  const useDefaultBg = process.argv.slice(2).includes('--default-bg')
-  const audioBg = useDefaultBg ? rel(DEFAULT_BGM) : null
   const targetFps = resolve30fps() ? 30 : 25
 
   const preset = resolveSizePreset()
@@ -1618,7 +1617,7 @@ export function burnVideo(scriptUrl, genDir) {
 
     console.log(`\n=== ${width}×${height} ===`)
     const ok = renderVideo({
-      clips: [clip], audioVoice, audioBg, output,
+      clips: [clip], audioVoice, audioBg: null, output,
       subtitlePath: existsSync(subtitlePath) ? subtitlePath : null,
       targetW: width, targetH: height, fps: targetFps,
     })
