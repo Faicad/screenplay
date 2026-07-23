@@ -239,15 +239,13 @@ export async function recordOne(electronApp, page, viewport, suffix, pageFn, rec
 
   setOrientation(viewport.width > viewport.height)
 
-  // Apply viewerParams to stores
+  // Apply viewerParams to stores — movie mode is always enabled for recording
   if (viewerParams) {
     await page.evaluate((vp) => {
       const store = window.__engineStore?.getState?.()
       if (!store) return
-      if (vp.movie_mode === '1' || vp.movie_mode === true) {
-        store.setMovieMode(true)
-        store.setControlsEnabled(false)
-      }
+      store.setMovieMode(true)
+      store.setControlsEnabled(false)
       if (vp.AutoRotate != null) {
         store.setAutoRotate(vp.AutoRotate === '1' || vp.AutoRotate === 'true' || vp.AutoRotate === true)
       }

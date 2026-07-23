@@ -2,7 +2,7 @@ import { existsSync, readFileSync, statSync, readdirSync, rmSync, renameSync, wr
 import { join, dirname, basename, extname, relative, resolve } from 'path'
 import { pathToFileURL } from 'url'
 import { spawn, spawnSync } from 'child_process'
-import { DEFAULT_BGM, screenplayDir } from './lib-common.mjs'
+import { DEFAULT_BGM, screenplayDir, resolveOrientationFilter } from './lib-common.mjs'
 import { makeCoverClip } from './coverClip.mjs'
 import { loadDotEnv } from './env.mjs'
 
@@ -361,12 +361,20 @@ function mergeProject(dirPath) {
     mergeSubtitles(genDir, baseNames, totalDur)
   }
 
-  // 8. Auto-play the merged video (horizontal preferred)
-  const playPath = existsSync(join(genDir, 'merged_h.mp4'))
-    ? join(genDir, 'merged_h.mp4')
-    : existsSync(join(genDir, 'merged_v.mp4'))
-      ? join(genDir, 'merged_v.mp4')
-      : null
+  // 8. Auto-play the merged video (respect -h/-v flag, default horizontal)
+  const orientationFilter = resolveOrientationFilter()
+  let playPath = null
+  if (orientationFilter !== 'both') {
+    playPath = join(genDir, `merged_${orientationFilter}.mp4`)
+    if (!existsSync(playPath)) playPath = null
+  }
+  if (!playPath) {
+    playPath = existsSync(join(genDir, 'merged_h.mp4'))
+      ? join(genDir, 'merged_h.mp4')
+      : existsSync(join(genDir, 'merged_v.mp4'))
+        ? join(genDir, 'merged_v.mp4')
+        : null
+  }
   if (playPath) {
     console.log(`\nPlaying: ${basename(playPath)}`)
     if (process.platform === 'win32') {
