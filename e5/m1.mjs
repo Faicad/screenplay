@@ -6,32 +6,11 @@ import * as lib from '../lib_3d_viewer_electron.mjs'
 const __dir = dirname(fileURLToPath(import.meta.url))
 
 const subtitle = `
-然后用它打开一个svg文件即可
-界面右侧会自动生成同目录的svg文件的缩略图
-如果缩略图很多
-点击右上角的一个最大化的图标
-就可以全屏查看全部的SVG文件了。
-是不是很方便
-关键是这个软件还是开源、免费的
+于是，我决定写一个软件来实现这个功能。
+这就是效果
+可以一次性浏览成百上千个SVG文件
+方便你快速找到自己想要的图标，非常方便
 `
-
-async function zoomSvg(page, factor) {
-  const fileId = await page.evaluate(() => {
-    const ws = window.__svgWorkspaceStore?.getState()
-    return ws?.files[0]?.fileId ?? null
-  })
-  if (!fileId) return
-  const steps = 20
-  const stepFactor = Math.pow(factor, 1 / steps)
-  await page.evaluate(async ({ fid, stepFactor, steps }) => {
-    const store = window.__svgWorkspaceStore.getState()
-    store.selectFile(fid)
-    for (let i = 0; i < steps; i++) {
-      store.zoomFile(fid, stepFactor)
-      await new Promise(r => setTimeout(r, 80))
-    }
-  }, { fid: fileId, stepFactor, steps })
-}
 
 async function ensureRightPanel(page) {
   await page.evaluate(() => {
@@ -42,161 +21,13 @@ async function ensureRightPanel(page) {
   })
 }
 
-async function injectPulseStyle(page) {
+async function clickFullscreenBtn(page) {
   await page.evaluate(() => {
-    if (document.getElementById('__my_style')) return
-    const style = document.createElement('style')
-    style.id = '__my_style'
-    style.textContent = `@keyframes __myPulse { 0%,100% { transform:scale(1); opacity:.9; } 50% { transform:scale(1.35); opacity:.4; } }`
-    document.head.appendChild(style)
+    document.querySelector('button[title="全屏查看缩略图"]')?.click()
   })
 }
 
-async function findFullscreenBtn(page) {
-  return page.evaluate(() => {
-    const byTitle = document.querySelector('button[title="全屏查看缩略图"]')
-    if (byTitle) { byTitle.id = '__fs_btn'; return true }
-    const allBtns = document.querySelectorAll('button')
-    for (const btn of allBtns) {
-      const svg = btn.querySelector('svg')
-      if (!svg) continue
-      if (svg.innerHTML.includes('M8') && svg.innerHTML.includes('H3') && svg.innerHTML.includes('V3')) {
-        btn.id = '__fs_btn'
-        return true
-      }
-    }
-    return false
-  })
-}
-
-async function highlightBtn(page) {
-  // Phase 1: 红框脉冲圆 + 标签
-  await page.evaluate(() => {
-    const btn = document.getElementById('__fs_btn')
-    if (!btn) return
-    const rect = btn.getBoundingClientRect()
-    const cx = rect.left + rect.width / 2
-    const cy = rect.top + rect.height / 2
-    const r = 56                      // 半径 2x (原 28)
-    const borderPx = 12               // 线宽 4x (原 3px)
-
-    let container = document.getElementById('movie-overlay-container')
-    if (!container) {
-      container = document.createElement('div')
-      container.id = 'movie-overlay-container'
-      container.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:9999'
-      document.body.appendChild(container)
-    }
-
-    const circle = document.createElement('div')
-    circle.id = '__my_highlight'
-    Object.assign(circle.style, {
-      position: 'absolute', left: `${cx - r}px`, top: `${cy - r}px`,
-      width: `${r * 2}px`, height: `${r * 2}px`, borderRadius: '50%',
-      border: `${borderPx}px solid #ff3333`,
-      background: 'rgba(255,50,50,0.15)',
-      boxShadow: '0 0 40px rgba(255,0,0,0.7), inset 0 0 20px rgba(255,0,0,0.25)',
-      animation: '__myPulse 0.8s ease-in-out infinite',
-      pointerEvents: 'none',
-    })
-    container.appendChild(circle)
-
-    const lbl = document.createElement('div')
-    lbl.id = '__my_label'
-    Object.assign(lbl.style, {
-      position: 'absolute', left: `${cx}px`, top: `${cy + r + 20}px`,
-      color: '#ff3333', fontSize: '32px', fontWeight: '700',
-      fontFamily: 'sans-serif', textShadow: '0 0 12px rgba(0,0,0,0.7)',
-      pointerEvents: 'none', whiteSpace: 'nowrap', transform: 'translateX(-50%)',
-    })
-    lbl.textContent = '全屏查看缩略图'
-    container.appendChild(lbl)
-  })
-
-  // 脉冲展示 1.5s
-  await page.waitForTimeout(1500)
-
-  // Phase 2: 鼠标光标从下方上升点击 + 清理
-  await page.evaluate(() => {
-    const btn = document.getElementById('__fs_btn')
-    if (!btn) return
-
-    // 移除脉冲圆 + 标签
-    document.getElementById('__my_highlight')?.remove()
-    document.getElementById('__my_label')?.remove()
-
-    const rect = btn.getBoundingClientRect()
-    const tx = rect.left + rect.width / 2
-    const ty = rect.top + rect.height / 2
-    const cursorSize = 96             // 鼠标 2x (原 48px)
-    const moveDistance = 240          // 移动距离 2x (原 120px)
-
-    let container = document.getElementById('movie-overlay-container')
-    if (!container) {
-      container = document.createElement('div')
-      container.id = 'movie-overlay-container'
-      container.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:9999'
-      document.body.appendChild(container)
-    }
-
-    // 起点：按钮正下方
-    const sx = tx
-    const sy = ty + moveDistance
-
-    // 创建鼠标光标 SVG（144px）
-    const cursor = document.createElement('div')
-    cursor.id = '__movie_cursor'
-    cursor.innerHTML =
-      `<svg width="${cursorSize}" height="${cursorSize}" viewBox="0 0 26 30">` +
-      `<polygon points="3,2 3,26 10,20 17,29 21,25 13,18 22,11" ` +
-      `fill="#fff" stroke="#222" stroke-width="1.8" stroke-linejoin="round"/></svg>`
-    Object.assign(cursor.style, {
-      position: 'fixed', zIndex: '10002', pointerEvents: 'none',
-      left: '0px', top: '0px',
-      filter: 'drop-shadow(4px 6px 8px rgba(0,0,0,0.5))',
-      transform: `translate(${sx - cursorSize * 0.12}px, ${sy - cursorSize * 0.08}px)`,
-    })
-    container.appendChild(cursor)
-
-    // 用 requestAnimationFrame 平滑移动，返回 Promise 让 evaluate 等待
-    return new Promise(resolve => {
-      const startTime = performance.now()
-      const moveDuration = 1200
-
-      function animateMove(now) {
-        const elapsed = now - startTime
-        const progress = Math.min(elapsed / moveDuration, 1)
-        // ease-out 曲线
-        const ease = 1 - Math.pow(1 - progress, 3)
-        const curX = sx + (tx - sx) * ease
-        const curY = sy + (ty - sy) * ease
-        cursor.style.transform =
-          `translate(${curX - cursorSize * 0.12}px, ${curY - cursorSize * 0.08}px)`
-
-        if (progress < 1) {
-          requestAnimationFrame(animateMove)
-        } else {
-          // 到达 → 点击 + 压扁反馈
-          btn.click()
-          cursor.style.transition = 'transform 0.08s ease-out'
-          cursor.style.transform =
-            `translate(${tx - cursorSize * 0.12}px, ${ty - cursorSize * 0.08}px) scale(0.6)`
-          setTimeout(() => {
-            cursor.style.transition = 'opacity 0.25s ease-out'
-            cursor.style.opacity = '0'
-            setTimeout(() => {
-              cursor.remove()
-              resolve()
-            }, 250)
-          }, 100)
-        }
-      }
-      requestAnimationFrame(animateMove)
-    })
-  })
-}
-
-async function scrollDown(page, { speed = 30, duration = 16000 } = {}) {
+async function scrollDown(page, { speed = 30, duration = 6000 } = {}) {
   await page.evaluate(async ({ speed, duration }) => {
     const fs = document.querySelector('.fixed.inset-0.z-50')
     if (!fs) return
@@ -234,13 +65,10 @@ lib.makeMovie(
     entryDuration: '0',
   },
   async (page, suffix, tPageOpen) => {
-    await zoomSvg(page, 5)
     await ensureRightPanel(page)
-    await injectPulseStyle(page)
-    const found = await findFullscreenBtn(page)
-    if (found) {
-      await highlightBtn(page)
-    }
+    await clickFullscreenBtn(page)
+    await page.waitForTimeout(1000)
+    await lib.contentStart(page)
     await scrollDown(page)
     await lib.screenshot(page, join(__dir, 'capture/m1_end'))
   },
