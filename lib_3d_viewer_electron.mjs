@@ -290,8 +290,18 @@ export async function recordOne(electronApp, page, viewport, suffix, pageFn, rec
       const fileId = crypto.randomUUID()
       const mtimeMs = Date.now()
 
-      // 1. Load into model store (so right-panel FileListPanel sees it as loaded)
+      const wsStore = window.__svgWorkspaceStore.getState()
       const modelStore = window.__modelStore.getState()
+
+      // 1. Load into SVG workspace store FIRST — before any async yield.
+      //    This ensures WorkspacePage sees isSvgMode=true immediately
+      //    and renders <SvgWorkspace /> instead of <ViewportContainer />,
+      //    preventing ViewportContainer from trying to load SVG as 3D model.
+      wsStore.addFilesBatch([{
+        fileId, fileName, svgText, layers, naturalWidth, naturalHeight,
+      }])
+
+      // 2. Load into model store (so right-panel FileListPanel sees it as loaded)
       modelStore.addLoadedFile({
         id: fileId, fileName, filePath: dirPath + '/' + fileName, mtimeMs,
         buffer: new ArrayBuffer(0),
@@ -300,7 +310,9 @@ export async function recordOne(electronApp, page, viewport, suffix, pageFn, rec
         svgLayers: layers, svgText,
       })
 
-      // 2. Read directory for sibling SVG files → populate file list (thumbnails)
+      // 3. Read directory for sibling SVG files → populate file list (thumbnails)
+      //    Safe to yield here: SVG workspace is already active, so no ModelGroup
+      //    will attempt to load SVG as 3D during the microtask gap.
       try {
         const dirResult = await window.electronAPI.readDirectory(dirPath)
         if (dirResult.success && dirResult.files) {
@@ -311,12 +323,6 @@ export async function recordOne(electronApp, page, viewport, suffix, pageFn, rec
       } catch (e) {
         console.warn('[svg] Failed to read directory:', e)
       }
-
-      // 3. Load into SVG workspace store (grid canvas)
-      const wsStore = window.__svgWorkspaceStore.getState()
-      wsStore.addFilesBatch([{
-        fileId, fileName, svgText, layers, naturalWidth, naturalHeight,
-      }])
 
       // 4. Explicitly set loadingPhase to 'done' so waitForModel passes
       modelStore.setLoadingPhase('done')
