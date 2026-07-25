@@ -6,7 +6,7 @@ const subtitle = `
 除了前面演示的7种新增格式
 之前还支持25种3D模型文件格式
 一共支持32种模型格式
-是已知开源免费软件里，格式支持最完善的
+FaiCAD是已知开源免费软件里，格式支持最完善的
 `;
 
 export function scene({ imagePath, width, height, duration, fps, index, startTime, totalDuration }) {

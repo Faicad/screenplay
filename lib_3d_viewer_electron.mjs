@@ -274,27 +274,79 @@ export async function recordOne(electronApp, page, viewport, suffix, pageFn, rec
   const tPageOpen = Date.now()
   console.log(`[${suffix}] Loading model: ${modelPath}`)
 
-  const loadFileParams = { filePath: modelPath }
-  if (viewerParams) {
-    const entryKeys = ['entryAnim', 'entryDir', 'entryDuration', 'entryZoomDist', 'entryZoomEndDist', 'entrySlideDist', 'entryTargetShiftY', 'entryEase']
-    for (const key of entryKeys) {
-      if (viewerParams[key] != null) loadFileParams[key] = viewerParams[key]
+  const isSvg = modelPath.toLowerCase().endsWith('.svg')
+
+  if (isSvg) {
+    // ── SVG load path: bypass loadFile (no three.js loader for SVG) ──
+    const svgText = readFileSync(modelPath, 'utf-8')
+    const { dir, name } = { dir: dirname(modelPath), name: basename(modelPath) }
+
+    await page.evaluate(async ({ svgText, fileName, dirPath }) => {
+      const helpers = window.__svgHelpers
+      if (!helpers) throw new Error('__svgHelpers not available')
+      const { parseSvgLayers, parseSvgViewBox } = helpers
+      const layers = parseSvgLayers(svgText)
+      const { naturalWidth, naturalHeight } = parseSvgViewBox(svgText)
+      const fileId = crypto.randomUUID()
+      const mtimeMs = Date.now()
+
+      // 1. Load into model store (so right-panel FileListPanel sees it as loaded)
+      const modelStore = window.__modelStore.getState()
+      modelStore.addLoadedFile({
+        id: fileId, fileName, filePath: dirPath + '/' + fileName, mtimeMs,
+        buffer: new ArrayBuffer(0),
+        format: 'svg', sceneTree: [], glbPartInfos: [], modelCenteringOffset: null,
+        sourceUnit: 'millimeter', fileGroup: 'vector', loadingPhase: 'done',
+        svgLayers: layers, svgText,
+      })
+
+      // 2. Read directory for sibling SVG files → populate file list (thumbnails)
+      try {
+        const dirResult = await window.electronAPI.readDirectory(dirPath)
+        if (dirResult.success && dirResult.files) {
+          modelStore.setFolderFiles(dirPath, dirResult.files)
+          const idx = dirResult.files.findIndex(f => f.name === fileName)
+          if (idx !== -1) modelStore.setSelectedFileIndex(idx)
+        }
+      } catch (e) {
+        console.warn('[svg] Failed to read directory:', e)
+      }
+
+      // 3. Load into SVG workspace store (grid canvas)
+      const wsStore = window.__svgWorkspaceStore.getState()
+      wsStore.addFilesBatch([{
+        fileId, fileName, svgText, layers, naturalWidth, naturalHeight,
+      }])
+
+      // 4. Explicitly set loadingPhase to 'done' so waitForModel passes
+      modelStore.setLoadingPhase('done')
+
+      return { fileId, fileName, format: 'svg' }
+    }, { svgText, fileName: name, dirPath: dir })
+    console.log(`[${suffix}] SVG loaded: ${name}`)
+  } else {
+    const loadFileParams = { filePath: modelPath }
+    if (viewerParams) {
+      const entryKeys = ['entryAnim', 'entryDir', 'entryDuration', 'entryZoomDist', 'entryZoomEndDist', 'entrySlideDist', 'entryTargetShiftY', 'entryEase']
+      for (const key of entryKeys) {
+        if (viewerParams[key] != null) loadFileParams[key] = viewerParams[key]
+      }
+      if (viewerParams.entryAnim === 'fade') {
+        delete loadFileParams.entryDir
+        delete loadFileParams.entryZoomDist
+        delete loadFileParams.entryZoomEndDist
+        delete loadFileParams.entrySlideDist
+        delete loadFileParams.entryTargetShiftY
+      }
     }
-    if (viewerParams.entryAnim === 'fade') {
-      delete loadFileParams.entryDir
-      delete loadFileParams.entryZoomDist
-      delete loadFileParams.entryZoomEndDist
-      delete loadFileParams.entrySlideDist
-      delete loadFileParams.entryTargetShiftY
+    const loadResult = await page.evaluate(async (fp) => {
+      return window.__executeCommand('loadFile', fp)
+    }, loadFileParams)
+    if (loadResult?.status === 'error') {
+      throw new Error(`Failed to load model: ${loadResult.error}`)
     }
+    console.log(`[${suffix}] Model loaded: ${loadResult?.data?.fileName}`)
   }
-  const loadResult = await page.evaluate(async (fp) => {
-    return window.__executeCommand('loadFile', fp)
-  }, loadFileParams)
-  if (loadResult?.status === 'error') {
-    throw new Error(`Failed to load model: ${loadResult.error}`)
-  }
-  console.log(`[${suffix}] Model loaded: ${loadResult?.data?.fileName}`)
 
   const tPageFn = Date.now()
   const { trimStart, tModelBrowser } = await startRecording(page, tPageOpen, entryDuration)
