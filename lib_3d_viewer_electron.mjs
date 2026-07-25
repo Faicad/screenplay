@@ -68,6 +68,23 @@ export async function waitForModel(page) {
   )
 }
 
+/**
+ * Mark the start of video content within pageFn.
+ * All browser actions BEFORE this call will be trimmed from the final video
+ * (the setup runs but the frames are discarded). Call it right before the
+ * "real" content begins.
+ *
+ * Usage:
+ *   await setupSomething(page)
+ *   await lib.contentStart(page)    // ← setup above trimmed away
+ *   await mainContent(page)         // ← this is what the video shows
+ */
+export async function contentStart(page) {
+  await page.evaluate(() => {
+    window.__movieContentStart = performance.now()
+  })
+}
+
 /** Standard recording opening: zoomUI → wait for model → entry animation → calculate trimStart */
 export async function startRecording(page, tPageOpen, entryDuration) {
   entryDuration = resolveOrientParam(entryDuration, getOrientation())
@@ -374,7 +391,24 @@ export async function recordOne(electronApp, page, viewport, suffix, pageFn, rec
   })
   const syncpoints = rawSPs.map(t => (t - tModelBrowser) / 1000)
 
-  let pageFnDuration = Date.now() - tPageFn
+  // ── Content start offset ──
+  // If the script called contentStart() inside pageFn, trim away the setup
+  // portion before that marker so the video starts at the "real" content.
+  let trimOffsetMs = 0
+  const csTime = await page.evaluate(() => {
+    const t = window.__movieContentStart
+    window.__movieContentStart = undefined
+    return t ?? null
+  })
+  if (csTime) {
+    trimOffsetMs = Math.round(csTime - tModelBrowser)
+    if (trimOffsetMs > 100) {
+      console.log(`  [contentStart] Skipping ${(trimOffsetMs / 1000).toFixed(2)}s of setup — video starts from contentStart point`)
+    }
+  }
+
+  let adjustedTrimStart = trimStart + trimOffsetMs
+  let pageFnDuration = Date.now() - tPageFn - trimOffsetMs
 
   if (ttsTiming) {
     const requiredEnd = ttsTiming.ttsTotal * 1000
@@ -382,7 +416,7 @@ export async function recordOne(electronApp, page, viewport, suffix, pageFn, rec
       const waitMs = Math.round(requiredEnd - pageFnDuration)
       console.log(`  [syncpoint implicit] Extending video by ${(waitMs / 1000).toFixed(2)}s for TTS total alignment...`)
       await page.waitForTimeout(waitMs)
-      pageFnDuration = Date.now() - tPageFn
+      pageFnDuration = Date.now() - tPageFn - trimOffsetMs
     }
 
     const diff = (pageFnDuration - ttsTiming.ttsTotal * 1000) / 1000
@@ -393,7 +427,7 @@ export async function recordOne(electronApp, page, viewport, suffix, pageFn, rec
   }
 
   const rawPath = await page.video()?.path()
-  return { rawPath, trimStart, pageFnDuration, syncpoints }
+  return { rawPath, trimStart: adjustedTrimStart, pageFnDuration, syncpoints }
 }
 
 export async function makeMovie(scriptUrl, modelPath, viewerParams, pageFn, outputDir) {
@@ -516,8 +550,8 @@ export async function makeMovie(scriptUrl, modelPath, viewerParams, pageFn, outp
     console.log(`[${suffix}] Trimming (start=${(trimStart / 1000).toFixed(2)}s, duration=${(pageFnDuration / 1000).toFixed(2)}s)...`)
     const r2 = spawnSync('ffmpeg', [
       '-y',
-      '-ss', (trimStart / 1000).toFixed(2),
       '-i', rawPath,
+      '-ss', (trimStart / 1000).toFixed(2),
       '-t', (pageFnDuration / 1000).toFixed(2),
       '-c:v', 'libvpx-vp9',
       '-b:v', '8M',

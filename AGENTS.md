@@ -46,7 +46,7 @@ Each project is a subdirectory under `` (e.g., `p1/`, `e1/`, `e2/`). Source file
 
 ### Script Template (Path A)
 
-参考设计文档：[syncpoint-design](./docs/syncpoint-design.md) · [subtitle-syntax](./docs/subtitle-syntax.md) 
+参考设计文档：[syncpoint-design](./docs/syncpoint-design.md) · [subtitle-syntax](./docs/subtitle-syntax.md) · [contentStart 设计](./docs/content-start-design.md)
 
 ```js
 import * as lib from '../lib-electron.mjs'
@@ -74,6 +74,20 @@ lib.makeMovie(
     await page.waitForTimeout(1500)
   },
 )
+
+// ── contentStart 用法 ──
+// 如果 pageFn 中有 setup 操作（如缩放、高亮按钮、等待过渡），
+// 但这些操作不需要出现在最终视频中，可以用 contentStart 标记正片起点：
+//
+// lib.makeMovie(import.meta.url, modelPath, {...}, async (page) => {
+//   await zoomSetup(page)           // 执行但被裁掉
+//   await highlightButton(page)
+//   await page.waitForTimeout(3000) // 等待过渡动画
+//
+//   await lib.contentStart(page)    // ← 视频从这里开始
+//
+//   await mainContent(page)         // ← 保留在视频中
+// })
 ```
 
 ### Path A 函数清单（`lib-electron.mjs`）
@@ -86,6 +100,7 @@ lib.makeMovie(
 |------|------|
 | `makeMovie(scriptUrl, modelPath, viewerParams, pageFn, outputDir)` | 录制入口：TTS 预生成 → 启动 Electron → 录制各方向 → FFmpeg 裁剪 |
 | `startRecording(page, tPageOpen, entryDuration)` | 标准开场：zoomUI → 等待模型加载 → 入场动画等待（由 `makeMovie` 自动调用，用户 pageFn 中无需重复调用） |
+| `contentStart(page)` | 在 pageFn 中标记视频正片起点，于此之前的 setup 操作自动从最终视频裁掉（详见 [contentStart 设计](./docs/content-start-design.md)） |
 | `syncpoint(page)` | 记录字幕同步点；若 TTS timing 已注入，自动等待当前组 TTS 播完；偏差 >1s 打印双向诊断（详见 [syncpoint-design](./docs/syncpoint-design.md) · [subtitle-syntax](./docs/subtitle-syntax.md)） |
 | `captureCover(page)` | 截图保存为封面（自动命名 `{project}_cover_{h\|v}.png`） |
 | `recordOne(electronApp, page, viewport, suffix, pageFn, recordDir, entryDuration, modelPath, ttsTiming, viewerParams)` | 录制单个方向的完整流程 |
