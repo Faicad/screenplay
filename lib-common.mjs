@@ -1659,9 +1659,9 @@ function parseDuration(val, tA, tB) {
     d = Number(val)
   }
 
-  // Clamp: min 0.1s, max half of the shorter clip
-  const maxD = Math.min(tA, tB) / 2
-  return Math.max(0.1, Math.min(d, maxD))
+  // Clamp: min 0.1s. No upper clamp — tpad extends the clip so the
+  // transition can be longer than the original clip duration.
+  return Math.max(0.1, d)
 }
 
 /**

@@ -184,21 +184,7 @@ function concatBurnedClips(clipPaths, outputPath, bgmPath, targetW, targetH, fps
  * 音频从 [i:a] 原样 concat，字幕已烘焙不处理。
  * 无 transition 的情况由 concatBurnedClips 处理，此函数仅处理有 transition 的 burned clips。
  */
-function mergeBurnedWithTransitions(clipPaths, outputPath, bgmPath, targetW, targetH, fps, coverPng, transitions) {
-  let coverCleanup = null
-  if (coverPng && existsSync(coverPng)) {
-    const coverClip = join(dirname(outputPath), `.cover_tmp_${basename(outputPath)}`)
-    const ok = makeCoverClip(coverPng, coverClip, targetW, targetH, fps)
-    if (ok) {
-      clipPaths = [coverClip, ...clipPaths]
-      coverCleanup = coverClip
-      console.log(`  Cover: ${coverPng} → 1-frame clip prepended`)
-    } else {
-      console.error(`  Cover: FAILED — ${coverPng}`)
-      return false
-    }
-  }
-
+function mergeBurnedWithTransitions(clipPaths, outputPath, bgmPath, targetW, targetH, fps, transitions) {
   const n = clipPaths.length
   const tempOutput = outputPath.replace(/\.\w+$/, '.tmp$&')
 
@@ -298,12 +284,9 @@ function mergeBurnedWithTransitions(clipPaths, outputPath, bgmPath, targetW, tar
     } catch (e) {
       console.error(`  Failed to rename:`, e.message)
       return false
-    } finally {
-      if (coverCleanup) try { rmSync(coverCleanup, { force: true }) } catch {}
     }
   } else {
     try { rmSync(tempOutput, { force: true }) } catch {}
-    if (coverCleanup) try { rmSync(coverCleanup, { force: true }) } catch {}
     console.error(`  FFmpeg exit code ${r.status}`)
     console.error(errStr.split('\n').slice(-10).join('\n'))
     return false
@@ -479,10 +462,43 @@ function mergeProject(dirPath) {
         mergedPath,
         bgmPath,
         info.width, info.height, info.fps,
-        covers[suffix] || null,
         oriTransitions,
       )
       if (!ok) process.exit(1)
+
+      // Cover prepend: merge done, now prepend cover as post-processing
+      const coverPath = covers[suffix]
+      if (coverPath) {
+        const fps = info.fps || 25
+        const coverClip = join(genDir, `.cover_tmp_merged_${suffix}.mp4`)
+        const cOk = makeCoverClip(coverPath, coverClip, info.width, info.height, fps)
+        if (cOk) {
+          const tempOutput = mergedPath.replace(/\.\w+$/, '.tmp$&')
+          const rel = (p) => relative(process.cwd(), p).replace(/\\/g, '/')
+          const cR = spawnSync('ffmpeg', [
+            '-y',
+            '-i', rel(coverClip),
+            '-i', rel(mergedPath),
+            '-filter_complex',
+            '[0:v]setpts=PTS-STARTPTS[vc];[1:v]setpts=PTS-STARTPTS[vo];[1:a]acopy[ao]' +
+            ';[vc][vo]concat=n=2:v=1:a=0[outv]',
+            '-map', '[outv]', '-map', '[ao]',
+            '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '18',
+            '-c:a', 'copy',
+            tempOutput,
+          ], { stdio: 'pipe', timeout: 60000 })
+          if (cR.status === 0 && existsSync(tempOutput) && statSync(tempOutput).size > 0) {
+            rmSync(mergedPath, { force: true })
+            renameSync(tempOutput, mergedPath)
+            const mb = Math.round(statSync(mergedPath).size / 1024 / 1024)
+            console.log(`  Cover: prepended to merged_${suffix}.mp4 (${mb} MB)`)
+          } else {
+            try { rmSync(tempOutput, { force: true }) } catch {}
+            console.error(`  Cover: concat FAILED for ${suffix}`)
+          }
+        }
+        try { rmSync(coverClip, { force: true }) } catch {}
+      }
     } else {
       console.log(`\n=== Merging ${suffix === 'h' ? 'horizontal' : 'vertical'} (${clips.length} clips, ${info.width}×${info.height}, ${info.fps}fps) ===`)
       const ok = concatBurnedClips(

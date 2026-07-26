@@ -59,6 +59,17 @@ Merge 统一使用 **burned 视频**（`_burn_.mp4`），每个文件自包含�
 
 burned 视频由 step 2 的 `burn.mjs` 自动生成，不存在时会报错。
 
+### Cover 处理
+
+Cover 不是 clip，不参与合并过程，不占用 transition 索引。
+
+| 路径 | Cover 处理方式 |
+|------|---------------|
+| 无 transitions（`concatBurnedClips`） | Cover 在函数内部拼接到 clip 列表开头，和所有 clip 一起 concat |
+| 有 transitions（`mergeBurnedWithTransitions`） | Cover **不作为 transition 的输入**。merge 完成后，通过 ffmpeg concat 将 cover 前置到 merged.mp4：`cover(1帧) + merged.mp4 → 替换 merged.mp4` |
+
+**有 transitions 时 cover 不参与合并的原因：** Transition 的 `from`/`to` 索引对应 burned 视频（m0, m1, m2...），cover 不在这个序列中。如果 cover 拼进 clip 列表，所有 transition 索引都会偏移 1。所以 cover 以**后处理方式**追加，不影响 transition 索引。索引保持和 merge.json 配置一致。
+
 ---
 
 ## 2. merge.json 配置
