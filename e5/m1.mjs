@@ -6,10 +6,9 @@ import * as lib from '../lib_3d_viewer_electron.mjs'
 const __dir = dirname(fileURLToPath(import.meta.url))
 
 const subtitle = `
-于是，我决定写一个软件来实现这个功能。
+于是我在自己写的3D查看器里实现了这个功能
 这就是效果
 可以一次性浏览成百上千个SVG文件
-方便快速找到自己想要的图标，非常方便
 `
 
 async function ensureRightPanel(page) {

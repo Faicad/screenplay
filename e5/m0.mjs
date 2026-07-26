@@ -1,8 +1,8 @@
 
 const subtitle = `
-我想快速浏览很多svg图片
-比如这个文件夹里的所有图片
-但是windows却不支持
+大量SVG图片如何快速浏览？
+比如这个文件夹里有几百张图片
+尝试预览，但是windows却不支持
 `;
 
 const image_config = [

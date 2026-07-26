@@ -6,12 +6,20 @@ import * as lib from '../lib_3d_viewer_electron.mjs'
 const __dir = dirname(fileURLToPath(import.meta.url))
 
 const subtitle = `
+使用也很简单
+用Faicad 3D查看器打开一个SVG文件
 界面右侧会自动生成同目录的svg文件的缩略图
-如果缩略图很多
-点击右上角的一个最大化的图标
+如果缩略图很多, 可以拖动缩略图区域
+把它从一排变成多排
+一次性查看更多内容
+如果要查看成百上千的图片
+--1--
+可以点击右上角的最大化图标
 就可以全屏查看全部的SVG文件了。
 是不是很方便
 关键是这个软件还是开源、免费的
+--2--
+求关注、求转发、求收藏
 `
 
 async function zoomSvg(page, factor) {
@@ -39,6 +47,125 @@ async function ensureRightPanel(page) {
     if (!ui.rightPanelOpen) ui.toggleRightPanel()
     if (!ui.enablePreview) ui.setEnablePreview(true)
   })
+}
+
+async function widenRightPanel(page, duration = 1200) {
+  // 找到右侧面板的 resize handle（总是最后一个 .cursor-col-resize）
+  const box = await page.evaluate(() => {
+    const handles = document.querySelectorAll('.cursor-col-resize')
+    if (handles.length === 0) return null
+    const h = handles[handles.length - 1]
+    if (!h) return null
+    const r = h.getBoundingClientRect()
+    return { x: r.left + r.width / 2, y: r.top + r.height / 2, w: window.innerWidth }
+  })
+  if (!box) return
+
+  const startX = box.x
+  const startY = box.y
+
+  // 计算 target X：让右侧面板从当前宽度翻倍（不超过 MAX_PANEL_PCT=40%）
+  // 公式：rightPanelPct = 100 - (clientX / windowWidth * 100)
+  // 当前宽度 = 100 - (startX / windowW * 100)
+  const curPct = 100 - (startX / box.w * 100)
+  const targetPct = Math.min(curPct * 2, 40)
+  const targetX = (100 - targetPct) / 100 * box.w
+
+  // 注入浮层鼠标光标（在 DOM 中创建一个鼠标 SVG，随真实鼠标同步移动）
+  await page.evaluate(({ startX, startY }) => {
+    const old = document.getElementById('__movie_cursor')
+    if (old) old.remove()
+    const cursor = document.createElement('div')
+    cursor.id = '__movie_cursor'
+    cursor.innerHTML =
+      `<svg width="48" height="48" viewBox="0 0 26 30">` +
+      `<polygon points="3,2 3,26 10,20 17,29 21,25 13,18 22,11" ` +
+      `fill="#fff" stroke="#222" stroke-width="1.8" stroke-linejoin="round"/></svg>`
+    Object.assign(cursor.style, {
+      position: 'fixed',
+      zIndex: '10002',
+      pointerEvents: 'none',
+      left: '0px',
+      top: '0px',
+      filter: 'drop-shadow(2px 3px 4px rgba(0,0,0,0.45))',
+      transform: `translate(${startX - 6}px, ${startY - 4}px)`,
+    })
+    document.body.appendChild(cursor)
+  }, { startX, startY })
+
+  await page.mouse.move(startX, startY)
+  await page.mouse.down()
+
+  // 平滑拖动（linear）
+  const steps = Math.max(Math.floor(duration / 16), 1)
+  for (let i = 1; i <= steps; i++) {
+    const t = i / steps
+    const ease = t                                      // linear
+    const x = startX + (targetX - startX) * ease
+    await page.mouse.move(x, startY)
+    // 同步更新浮层光标位置
+    await page.evaluate(({ x, y }) => {
+      const c = document.getElementById('__movie_cursor')
+      if (c) c.style.transform = `translate(${x - 6}px, ${y - 4}px)`
+    }, { x, y: startY })
+    await new Promise(r => setTimeout(r, Math.floor(duration / steps)))
+  }
+
+  await page.mouse.up()
+
+  // 拖拽完成后移除浮层光标
+  await page.evaluate(() => {
+    const c = document.getElementById('__movie_cursor')
+    if (c) c.remove()
+  })
+}
+
+async function showEndingOverlay(page) {
+  await page.evaluate(() => {
+    const old = document.getElementById('__ending_overlay')
+    if (old) old.remove()
+
+    const gsap = window.__gsap
+
+    // 全屏遮罩层（半透明黑底 + 模糊）
+    const overlay = document.createElement('div')
+    overlay.id = '__ending_overlay'
+    overlay.style.cssText = `
+      position: fixed; inset: 0; z-index: 10001;
+      background: rgba(0,0,0,0.45);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      display: flex; align-items: center; justify-content: center;
+      pointer-events: none;
+      opacity: 0;
+    `
+
+    // 文字容器
+    const text = document.createElement('div')
+    text.textContent = '求关注 · 求转发 · 求收藏'
+    text.style.cssText = `
+      color: #fff;
+      font-size: 72px;
+      font-weight: 800;
+      font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+      text-shadow: 0 4px 20px rgba(0,0,0,0.6);
+      letter-spacing: 6px;
+      transform: scale(0.7);
+      opacity: 0;
+    `
+    overlay.appendChild(text)
+    document.body.appendChild(overlay)
+
+    // GSAP 动画：遮罩淡入 + 文字弹出
+    gsap.to(overlay, { opacity: 1, duration: 0.6, ease: 'power2.out' })
+    gsap.to(text, {
+      opacity: 1, scale: 1, duration: 0.8, ease: 'back.out(1.7)',
+      delay: 0.15,
+    })
+  })
+
+  // 等待 TTS 朗读完最后一句
+  await page.waitForTimeout(2000)
 }
 
 async function injectPulseStyle(page) {
@@ -223,6 +350,36 @@ async function scrollDown(page, { speed = 30, duration = 16000 } = {}) {
   }, { speed, duration })
 }
 
+async function scrollRightPanel(page, { speed = 30, duration = 2000 } = {}) {
+  await page.evaluate(async ({ speed, duration }) => {
+    // 右侧面板内部的缩略图滚动区域（最后一个 data-radix-scroll-area-viewport）
+    const rp = document.querySelector('aside.flex.flex-col.shrink-0:not([data-testid])')
+    if (!rp) return
+    const vps = rp.querySelectorAll('[data-radix-scroll-area-viewport]')
+    const sa = vps[vps.length - 1]
+    if (!sa) return
+    const maxTop = sa.scrollHeight - sa.clientHeight
+    if (maxTop <= 0) return
+    const startTop = sa.scrollTop
+    const start = performance.now()
+    let prevTop = startTop
+    const pxPerMs = speed / 1000
+    function tick() {
+      const elapsed = performance.now() - start
+      if (elapsed >= duration) return
+      const delta = Math.round(elapsed * pxPerMs)
+      const top = Math.min(startTop + delta, maxTop)
+      if (top !== prevTop) {
+        sa.scrollTop = top
+        prevTop = top
+      }
+      requestAnimationFrame(tick)
+    }
+    tick()
+    await new Promise(r => setTimeout(r, duration))
+  }, { speed, duration })
+}
+
 
 lib.makeMovie(
   import.meta.url,
@@ -233,14 +390,28 @@ lib.makeMovie(
     entryDuration: '0',
   },
   async (page, suffix, tPageOpen) => {
-    await zoomSvg(page, 5)
+    await zoomSvg(page, 2)
+    await lib.contentStart(page)
+
+    await page.waitForTimeout(1000)    
     await ensureRightPanel(page)
+    await scrollRightPanel(page, { speed: 30, duration: 9000 })
+
+    await widenRightPanel(page, 2200)
+    await page.waitForTimeout(1000)
+    await lib.syncpoint(page)
+
     await injectPulseStyle(page)
     const found = await findFullscreenBtn(page)
     if (found) {
       await highlightBtn(page)
     }
-    await scrollDown(page)
-    await lib.screenshot(page, join(__dir, 'capture/m1_end'))
+    await scrollDown(page, { speed: 30, duration: 12000 } )
+    // await lib.screenshot(page, join(__dir, 'capture/m1_end'))
+    await lib.captureCover(page)
+
+    await lib.syncpoint(page)
+
+    await showEndingOverlay(page)
   },
 )

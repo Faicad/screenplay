@@ -415,7 +415,47 @@ function mergeProject(dirPath) {
     }
   }
 
-  // 7. (备查) Generate merged subtitle from per-clip subtitles
+  // 7b. Post-processing: prepend cover to merged videos
+  for (const suffix of ['h', 'v']) {
+    const coverPath = covers[suffix]
+    if (!coverPath) continue
+    const mergedPath = join(genDir, `merged_${suffix}.mp4`)
+    if (!existsSync(mergedPath)) continue
+
+    const info = probeVideo(mergedPath)
+    if (!info) continue
+    const fps = info.fps || 25
+    const coverClip = join(genDir, `.cover_tmp_merged_${suffix}.mp4`)
+    const ok = makeCoverClip(coverPath, coverClip, info.width, info.height, fps)
+    if (!ok) continue
+
+    const tempOutput = mergedPath.replace(/\.\w+$/, '.tmp$&')
+    const rel = (p) => relative(process.cwd(), p).replace(/\\/g, '/')
+    const r = spawnSync('ffmpeg', [
+      '-y',
+      '-i', rel(coverClip),
+      '-i', rel(mergedPath),
+      '-filter_complex',
+      '[0:v]setpts=PTS-STARTPTS[vc];[1:v]setpts=PTS-STARTPTS[vo];[1:a]acopy[ao];' +
+      '[vc][vo]concat=n=2:v=1:a=0[outv]',
+      '-map', '[outv]', '-map', '[ao]',
+      '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '18',
+      '-c:a', 'copy',
+      tempOutput,
+    ], { stdio: 'pipe', timeout: 60000 })
+    if (r.status === 0 && existsSync(tempOutput) && statSync(tempOutput).size > 0) {
+      rmSync(mergedPath, { force: true })
+      renameSync(tempOutput, mergedPath)
+      const mb = Math.round(statSync(mergedPath).size / 1024 / 1024)
+      console.log(`  Cover: prepended to merged_${suffix}.mp4 (${mb} MB)`)
+    } else {
+      try { rmSync(tempOutput, { force: true }) } catch {}
+      console.error(`  Cover: concat FAILED for ${suffix}`)
+    }
+    try { rmSync(coverClip, { force: true }) } catch {}
+  }
+
+  // 8. (备查) Generate merged subtitle from per-clip subtitles
   const refClips = clips_h.length > 0 ? clips_h : clips_v
   const totalDur = refClips.reduce((sum, c) => {
     const info = probeVideo(c)
