@@ -2,7 +2,7 @@ import { existsSync, readFileSync, statSync, readdirSync, rmSync, renameSync, wr
 import { join, dirname, basename, extname, relative, resolve } from 'path'
 import { pathToFileURL } from 'url'
 import { spawn, spawnSync } from 'child_process'
-import { DEFAULT_BGM, screenplayDir, resolveOrientationFilter } from './lib-common.mjs'
+import { DEFAULT_BGM, screenplayDir, resolveOrientationFilter, resolveTransitions, mergeVideoWithTransitions } from './lib-common.mjs'
 import { makeCoverClip } from './coverClip.mjs'
 import { loadDotEnv } from './env.mjs'
 
@@ -265,19 +265,48 @@ function mergeProject(dirPath) {
     }
   }
 
-  // 4. Collect burned clips
+  // 4. Collect raw materials (.webm + .mp3 + .subtitle) for transition-capable merge
   const genDir = join(absDir, 'gen')
   const baseNames = files.map(f => basename(f, '.mjs'))
+
+  // Collect by orientation
   const clips_h = []
   const clips_v = []
+  const voices_h = []
+  const voices_v = []
   for (const name of baseNames) {
-    const h = join(genDir, `${name}_burn_h.mp4`)
-    const v = join(genDir, `${name}_burn_v.mp4`)
-    if (existsSync(h) && statSync(h).size > 0) clips_h.push(h)
-    if (existsSync(v) && statSync(v).size > 0) clips_v.push(v)
+    const hPath = join(genDir, `${name}_h.webm`)
+    const vPath = join(genDir, `${name}_v.webm`)
+    if (existsSync(hPath) && statSync(hPath).size > 0) {
+      clips_h.push(hPath)
+      voices_h.push(join(genDir, `${name}.mp3`))
+    }
+    if (existsSync(vPath) && statSync(vPath).size > 0) {
+      clips_v.push(vPath)
+      voices_v.push(join(genDir, `${name}.mp3`))
+    }
   }
+
+  // Fallback to burned clips if no raw .webm found
+  const useBurnedFallback_h = clips_h.length === 0 && baseNames.length > 0
+  const useBurnedFallback_v = clips_v.length === 0 && baseNames.length > 0
+
+  if (useBurnedFallback_h || useBurnedFallback_v) {
+    console.log('  No raw .webm clips found, falling back to burned clips')
+    for (const name of baseNames) {
+      if (useBurnedFallback_h) {
+        const h = join(genDir, `${name}_burn_h.mp4`)
+        if (existsSync(h) && statSync(h).size > 0) clips_h.push(h)
+      }
+      if (useBurnedFallback_v) {
+        const v = join(genDir, `${name}_burn_v.mp4`)
+        if (existsSync(v) && statSync(v).size > 0) clips_v.push(v)
+      }
+    }
+  }
+
   if (clips_h.length === 0 && clips_v.length === 0) {
-    console.error('No usable burned clips found')
+    console.error('No usable clips found')
     process.exit(1)
   }
 
@@ -301,8 +330,20 @@ function mergeProject(dirPath) {
   // ── Check force flag for merge's own cache ──
   const mergeForce = process.argv.slice(3).includes('-f') || process.argv.slice(3).includes('--force')
 
-  // 6. Merge each orientation
-  for (const [clips, suffix] of [[clips_h, 'h'], [clips_v, 'v']]) {
+  // 6. Parse transitions — compute per-orientation since clip counts may differ
+  function computeTransitions(clips) {
+    if (clips.length < 2) return []
+    const clipDurations = clips.map(c => {
+      const info = probeVideo(c)
+      return info?.duration || 0
+    })
+    return resolveTransitions(mergeCfg, clips.length, clipDurations)
+  }
+  const transitions_h = computeTransitions(clips_h)
+  const transitions_v = computeTransitions(clips_v)
+
+  // 7. Merge each orientation — use mergeVideoWithTransitions for raw webm, fallback to concatBurnedClips for burned
+  for (const [clips, voices, suffix] of [[clips_h, voices_h, 'h'], [clips_v, voices_v, 'v']]) {
     if (clips.length === 0) continue
     const mergedPath = join(genDir, `merged_${suffix}.mp4`)
 
@@ -322,20 +363,56 @@ function mergeProject(dirPath) {
       }
     }
 
-    const info = probeVideo(clips[0])
-    if (!info) {
-      console.error(`Cannot probe clip: ${clips[0]}`)
-      process.exit(1)
+    const isUsingRawWebm = !clips[0].includes('_burn_')
+    const useBurned = useBurnedFallback_h || useBurnedFallback_v
+
+    if (isUsingRawWebm && !useBurned) {
+      // ── New path: mergeVideoWithTransitions (supports transitions) ──
+      const info = probeVideo(clips[0])
+      if (!info) {
+        console.error(`Cannot probe clip: ${clips[0]}`)
+        process.exit(1)
+      }
+      const oriTransitions = suffix === 'h' ? transitions_h : transitions_v
+      console.log(`\n=== Merging ${suffix === 'h' ? 'horizontal' : 'vertical'} (${clips.length} clips, ${info.width}×${info.height}, ${info.fps}fps, ${oriTransitions.length} transition(s)) ===`)
+
+      // Generate merged subtitle
+      const totalDur = clips.reduce((sum, c) => {
+        const probe = probeVideo(c)
+        return sum + (probe?.duration || 0)
+      }, 0)
+      const mergedSubPath = mergeSubtitles(genDir, baseNames, totalDur)
+
+      const ok = mergeVideoWithTransitions({
+        videoClips: clips,
+        audioVoices: voices,
+        subtitlePath: mergedSubPath,
+        output: mergedPath,
+        targetW: info.width,
+        targetH: info.height,
+        fps: info.fps,
+        bgmPath: existsSync(bgmPath) ? bgmPath : null,
+        transitions: oriTransitions.length > 0 ? oriTransitions : undefined,
+        coverPng: covers[suffix] || undefined,
+      })
+      if (!ok) process.exit(1)
+    } else {
+      // ── Fallback: original concatBurnedClips (no transitions) ──
+      const info = probeVideo(clips[0])
+      if (!info) {
+        console.error(`Cannot probe clip: ${clips[0]}`)
+        process.exit(1)
+      }
+      console.log(`\n=== Merging ${suffix === 'h' ? 'horizontal' : 'vertical'} (${clips.length} clips, ${info.width}×${info.height}, ${info.fps}fps) ===`)
+      const ok = concatBurnedClips(
+        clips,
+        mergedPath,
+        bgmPath,
+        info.width, info.height, info.fps,
+        covers[suffix] || null,
+      )
+      if (!ok) process.exit(1)
     }
-    console.log(`\n=== Merging ${suffix === 'h' ? 'horizontal' : 'vertical'} (${clips.length} clips, ${info.width}×${info.height}, ${info.fps}fps) ===`)
-    const ok = concatBurnedClips(
-      clips,
-      mergedPath,
-      bgmPath,
-      info.width, info.height, info.fps,
-      covers[suffix] || null,
-    )
-    if (!ok) process.exit(1)
   }
 
   // 7. (备查) Generate merged subtitle from per-clip subtitles

@@ -1,0 +1,6 @@
+{
+  "transition": {
+    "type": "slideleft",
+    "duration": 0.5
+  }
+}

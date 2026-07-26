@@ -742,6 +742,29 @@ node mergeVideo.mjs p1 -g -f -h       # 1080p + 强制 + 仅横屏
 { "audioBg": "Jamvana - Pure Ocean.mp3" }
 ```
 
+**自定义片段切换过渡**：在 `merge.json` 中声明过渡动画，支持所有视频类型（3D 录制/截图合成/HTML 动画/URL 录制）。
+
+全局默认过渡（所有 clip 之间生效）：
+
+```json
+// e5/merge.json
+{ "transition": { "type": "slideleft", "duration": 0.5 } }
+```
+
+逐条覆盖（按 clip 序号）：
+
+```json
+{ "transitions": [
+  { "from": 0, "to": 1, "type": "fade",      "duration": 0.4 },
+  { "from": 1, "to": 2, "type": "zoomin",    "duration": 0.6 },
+  { "from": 2, "to": 3, "type": "fadeblack", "duration": 0.3 }
+] }
+```
+
+支持 25+ 种过渡类型：`fade`（叠化）、`slideleft/slideright/slideup/slidedown`（滑动）、`zoomin`（放大进入）、`dissolve`（溶解）、`circleclose/circleopen`（圆形展开/收缩）、`wipeleft/wiperight`（擦除）、`pixelize`（像素化）等。
+
+详见 [`docs/merge-guide.md`](./docs/merge-guide.md)。
+
 ### 核心渲染函数 `renderVideo`
 
 `burn.mjs` 和 `mergeVideo.mjs` 底层共用同一函数：

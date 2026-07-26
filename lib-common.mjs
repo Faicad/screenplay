@@ -1566,6 +1566,394 @@ export function renderVideo({ clips, subtitlePath, audioVoice, audioBg, output, 
   }
 }
 
+// ──────────────────────────────────────────────
+// Video Transitions (xfade)
+// ──────────────────────────────────────────────
+
+/** Known xfade transition types. */
+const XFADE_TYPES = new Set([
+  'fade', 'fadeblack', 'fadewhite', 'fadegrays',
+  'slideleft', 'slideright', 'slideup', 'slidedown',
+  'smoothleft', 'smoothright', 'smoothup', 'smoothdown',
+  'wipeleft', 'wiperight', 'wipeup', 'wipedown',
+  'circleclose', 'circleopen', 'rectclose', 'rectopen',
+  'dissolve', 'pixelize', 'zoomin',
+  'hlslice', 'hrslice', 'vuslice', 'vdslice', 'distance',
+])
+
+/** Default transition duration in seconds. */
+const DEFAULT_TRANSITION_DURATION = 0.4
+
+/**
+ * Parse merge.json transition config into resolved transition array.
+ *
+ * @param {object} mergeCfg        — merge.json parsed content
+ * @param {number} clipCount       — number of clips
+ * @param {number[]} clipDurations — duration of each clip in seconds
+ * @returns {Array<{type:string, duration:number, from:number, to:number}>}
+ */
+export function resolveTransitions(mergeCfg, clipCount, clipDurations) {
+  const transitions = []
+
+  // Global default
+  const globalType = mergeCfg?.transition?.type || null
+  const globalDuration = mergeCfg?.transition?.duration || null
+
+  // Per-boundary overrides
+  const explicit = mergeCfg?.transitions || []
+
+  for (let i = 0; i < clipCount - 1; i++) {
+    const match = explicit.find(t => t.from === i && t.to === i + 1)
+    let type = match?.type || globalType || 'fade'
+    let duration = parseDuration(match?.duration ?? globalDuration, clipDurations[i], clipDurations[i + 1])
+
+    if (!XFADE_TYPES.has(type)) {
+      console.warn(`  [transition] Unknown type "${type}" at boundary ${i}→${i+1}, falling back to "fade"`)
+      type = 'fade'
+    }
+
+    transitions.push({ type, duration, from: i, to: i + 1 })
+  }
+
+  if (transitions.length > 0) {
+    const types = transitions.map(t => `${t.type}(${t.duration}s)`).join(', ')
+    console.log(`  Transitions: ${types}`)
+  }
+
+  return transitions
+}
+
+/**
+ * Parse duration value (number or percentage string like "10%").
+ * @param {number|string|null} val
+ * @param {number} tA — duration of preceding clip
+ * @param {number} tB — duration of following clip
+ * @returns {number} duration in seconds, clamped to [0.1, min(tA, tB)/2]
+ */
+function parseDuration(val, tA, tB) {
+  if (val == null) return DEFAULT_TRANSITION_DURATION
+
+  let d
+  if (typeof val === 'string' && val.endsWith('%')) {
+    const pct = parseFloat(val) / 100
+    d = Math.min(tA, tB) * pct
+  } else {
+    d = Number(val)
+  }
+
+  // Clamp: min 0.1s, max half of the shorter clip
+  const maxD = Math.min(tA, tB) / 2
+  return Math.max(0.1, Math.min(d, maxD))
+}
+
+/**
+ * Build ffmpeg filter_complex string for xfade transitions + audio concat with short fades.
+ *
+ * ffmpeg input layout:
+ *   [0..N-1] = .webm video clips (only :v stream used)
+ *   [N..2N-1] = .mp3 audio clips (one per clip, may be null/dummy)
+ *   [2N] = BGM (optional)
+ *
+ * @param {Array}   transitions — result of resolveTransitions()
+ * @param {number}  targetW, targetH, fps
+ * @param {number[]} clipDurations — duration of each clip in seconds
+ * @param {number}  N — number of clips
+ * @returns {{ filterComplex: string, videoLabel: string, audioLabel: string|null, totalDuration: number }}
+ */
+export function buildTransitionFilter(transitions, targetW, targetH, fps, clipDurations, N) {
+  const parts = []
+  const AUDIO_FADE = 0.1  // short fade to avoid click/pop without voice overlap
+
+  // ── Video: scale+pad each clip (settb normalizes timebase for xfade compat) ──
+  for (let i = 0; i < N; i++) {
+    parts.push(
+      `[${i}:v]scale=${targetW}:${targetH}:force_original_aspect_ratio=decrease,`
+      + `pad=${targetW}:${targetH}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=${fps},settb=1/${fps}[v${i}]`
+    )
+  }
+
+  // ── Video: chain xfade ──
+  if (transitions.length === 0) {
+    // No transitions — simple concat
+    const vLabels = clipDurations.map((_, i) => `[v${i}]`).join('')
+    parts.push(`${vLabels}concat=n=${N}:v=1:a=0[rawv]`)
+  } else {
+    // Apply xfade sequentially
+    let prevLabel = 'v0'
+    let accDuration = clipDurations[0]
+
+    for (let i = 0; i < transitions.length; i++) {
+      const t = transitions[i]
+      const nextClipIdx = i + 1
+      // offset = position in the accumulated video where transition starts
+      // Transition starts (duration) seconds before the end of the accumulated video
+      const offset = Math.max(0, accDuration - t.duration)
+      const outLabel = i === transitions.length - 1 ? 'rawv' : `x${i + 1}`
+      parts.push(
+        `[${prevLabel}][v${nextClipIdx}]xfade=transition=${t.type}:duration=${t.duration}:offset=${offset.toFixed(3)}[${outLabel}]`
+      )
+      prevLabel = outLabel
+      accDuration = accDuration + clipDurations[nextClipIdx] - t.duration
+    }
+  }
+
+  // ── Audio: concat with short fades ──
+  for (let i = 0; i < N; i++) {
+    const audioInputIdx = N + i  // .mp3 files start at input index N
+    const dur = clipDurations[i]
+    const fadeOutStart = Math.max(0, dur - AUDIO_FADE)
+    const fadeIn = `afade=t=in:st=0:d=${AUDIO_FADE}`
+    const fadeOut = `afade=t=out:st=${fadeOutStart.toFixed(3)}:d=${AUDIO_FADE}`
+
+    if (i === 0) {
+      // First clip: fade out only
+      parts.push(`[${audioInputIdx}:a]${fadeOut},aresample=48000[a${i}]`)
+    } else if (i === N - 1) {
+      // Last clip: fade in only
+      parts.push(`[${audioInputIdx}:a]${fadeIn},aresample=48000[a${i}]`)
+    } else {
+      // Middle clips: fade in + fade out
+      parts.push(`[${audioInputIdx}:a]${fadeIn},${fadeOut},aresample=48000[a${i}]`)
+    }
+  }
+
+  const audioLabels = clipDurations.map((_, i) => `[a${i}]`).join('')
+  parts.push(`${audioLabels}concat=n=${N}:v=0:a=1[outa]`)
+
+  // Compute total video duration (with transitions reducing it)
+  const totalDuration = clipDurations.reduce((sum, d) => sum + d, 0)
+    - transitions.reduce((sum, t) => sum + t.duration, 0)
+
+  return {
+    filterComplex: parts.join(';'),
+    videoLabel: 'rawv',
+    audioLabel: 'outa',
+    totalDuration,
+  }
+}
+
+/**
+ * Merge multiple video clips with transitions, subtitle burn, and audio mix.
+ *
+ * Works on raw materials (pre-burn .webm + .mp3 + .subtitle) so that:
+ * - Video: xfade transitions are clean (no burned-in subtitle overlap)
+ * - Audio: short fades prevent TTS voice overlap
+ * - Subtitles: burned once on the merged result
+ *
+ * @param {object} opts
+ * @param {string[]}   opts.videoClips    — .webm paths (one per clip, must exist)
+ * @param {(string|null)[]} opts.audioVoices — .mp3 paths (one per clip, null = no audio)
+ * @param {string|null} opts.subtitlePath — merged .subtitle path (may be null to skip subtitle burn)
+ * @param {string}     opts.output        — output .mp4 path
+ * @param {number}     opts.targetW, targetH, fps
+ * @param {string|null} [opts.bgmPath]    — BGM .wav path (optional)
+ * @param {Array}      [opts.transitions] — resolved transitions (optional)
+ * @param {string|null} [opts.coverPng]   — cover PNG path for 1-frame prepend (optional)
+ * @returns {boolean} success
+ */
+export function mergeVideoWithTransitions(opts) {
+  const {
+    videoClips, audioVoices, subtitlePath, output,
+    targetW, targetH, fps,
+    bgmPath, transitions, coverPng,
+  } = opts
+
+  const rel = (p) => relative(process.cwd(), p).replace(/\\/g, '/')
+  const N = videoClips.length
+
+  if (N === 0) {
+    console.error('  No video clips provided')
+    return false
+  }
+
+  // ── Validate inputs ──
+  const validVideoClips = videoClips.filter(c => clipExists(c))
+  if (validVideoClips.length !== N) {
+    console.error(`  Missing ${N - validVideoClips.length} video clip(s)`)
+    return false
+  }
+
+  const validAudioVoices = audioVoices.map(a => a && clipExists(a) ? a : null)
+  const hasAnyAudio = validAudioVoices.some(a => a !== null)
+
+  // ── Probe clip durations ──
+  const clipDurations = videoClips.map(c => {
+    const info = probe(c)
+    return info?.format?.duration ? parseFloat(info.format.duration) : 0
+  })
+
+  if (clipDurations.some(d => d <= 0)) {
+    console.error('  Failed to probe clip durations')
+    return false
+  }
+
+  // ── Build filter graph ──
+  const trans = transitions || []
+  const { filterComplex, videoLabel, audioLabel, totalDuration } = buildTransitionFilter(
+    trans, targetW, targetH, fps, clipDurations, N
+  )
+
+  // ── Build ASS subtitle (merged) ──
+  let assLabel = videoLabel
+  let assCleanup = null
+  if (subtitlePath && existsSync(subtitlePath)) {
+    const tempAss = (() => {
+      try {
+        const data = JSON.parse(readFileSync(subtitlePath, 'utf-8'))
+        const seg = data.segments[0]
+        if (!seg || !seg.entries || seg.entries.length === 0) return null
+
+        const REF_W = 1920
+        const REF_H = 1080
+        const scaleX = targetW / REF_W
+        const scaleY = targetH / REF_H
+        const scale = Math.sqrt(scaleX * scaleY)
+        const s = (v) => Math.max(1, Math.round(v * scale))
+
+        const BASE_STYLE = {
+          fontName: 'Microsoft YaHei', fontSize: 52,
+          primaryColour: '&H00FFFFFF', secondaryColour: '&H000000FF',
+          outlineColour: '&H00000000', backColour: '&H80000000',
+          outline: 2.5, shadow: 0.5,
+          marginL: 60, marginR: 60, marginV: 80,
+        }
+
+        const karaokeDisabled = process.env.KARAOKE_TTS_PROVIDERS === ''
+
+        const karaokeStyle = `Style: Karaoke,${BASE_STYLE.fontName},${s(BASE_STYLE.fontSize)},&H0000FFFF,${BASE_STYLE.primaryColour},${BASE_STYLE.outlineColour},${BASE_STYLE.backColour},0,0,0,0,100,100,0,0,1,${s(BASE_STYLE.outline)},${s(BASE_STYLE.shadow)},2,${s(BASE_STYLE.marginL)},${s(BASE_STYLE.marginR)},${s(BASE_STYLE.marginV)},1`
+        const normalStyle = `Style: Default,${BASE_STYLE.fontName},${s(BASE_STYLE.fontSize)},${BASE_STYLE.primaryColour},${BASE_STYLE.secondaryColour},${BASE_STYLE.outlineColour},${BASE_STYLE.backColour},0,0,0,0,100,100,0,0,1,${s(BASE_STYLE.outline)},${s(BASE_STYLE.shadow)},2,${s(BASE_STYLE.marginL)},${s(BASE_STYLE.marginR)},${s(BASE_STYLE.marginV)},1`
+
+        const dialogueLines = seg.entries.map(e => {
+          const text = e.t.replace(/\\n/g, '\\N')
+          return `Dialogue: 0,${toAssTime(e.s)},${toAssTime(e.e)},Default,,0,0,0,,${text}`
+        }).join('\n')
+
+        const assContent = `[Script Info]
+Title: merged subtitles
+ScriptType: v4.00+
+Collisions: Normal
+PlayResX: ${targetW}
+PlayResY: ${targetH}
+ScaledBorderAndShadow: yes
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+${normalStyle}
+${karaokeStyle}
+ 
+ [Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+${dialogueLines}
+`
+        const tempPath = join(dirname(output), `.ass_merged_${targetW}x${targetH}.ass`)
+        writeFileSync(tempPath, assContent)
+        return tempPath
+      } catch (e) {
+        console.error('  Failed to build ASS:', e.message)
+        return null
+      }
+    })()
+
+    if (tempAss) {
+      filterComplex.includes('rawv') && (assLabel = 'finalv')
+      assCleanup = tempAss
+    }
+  }
+
+  // ── Assemble ffmpeg inputs ──
+  // Input order: [0..N-1] = .webm, [N..2N-1] = .mp3, [2N] = BGM (optional)
+  const allInputs = [...videoClips]
+  for (const v of validAudioVoices) {
+    if (v) allInputs.push(v)
+    else {
+      // Generate a silent placeholder via lavfi
+      const dummy = join(dirname(output), `.silence_tmp_${allInputs.length}.wav`)
+      if (!existsSync(dummy)) {
+        spawnSync('ffmpeg', ['-y', '-f', 'lavfi', '-i', 'anullsrc=r=48000:cl=stereo', '-t', '0.1', dummy],
+          { stdio: 'pipe', timeout: 10000 })
+      }
+      allInputs.push(dummy)
+    }
+  }
+
+  if (bgmPath && clipExists(bgmPath)) {
+    allInputs.push(bgmPath)
+  }
+
+  // ── Build final filter_complex ──
+  let finalFilter = filterComplex
+  const bgmIdx = 2 * N
+
+  // If we have a cover PNG, we'd need to handle it here
+  // For now, coverPng is handled in the merge flow (prepended as 1-frame clip before mergeVideoWithTransitions)
+
+  // Apply ASS subtitle to video
+  if (assCleanup) {
+    finalFilter += `;[rawv]ass='${rel(assCleanup)}'[finalv]`
+  }
+
+  // Mix BGM if present
+  let audioMapLabel = audioLabel
+  if (bgmPath && clipExists(bgmPath)) {
+    finalFilter += `;[${audioLabel}][${bgmIdx}:a]amix=inputs=2:duration=first:dropout_transition=2[finala]`
+    audioMapLabel = 'finala'
+  }
+
+  // ── Run ffmpeg ──
+  const tempOutput = output.replace(/\.\w+$/, '.tmp$&')
+  const args = [
+    '-y',
+    ...allInputs.flatMap(f => ['-i', f]),
+    '-filter_complex', finalFilter,
+    '-map', `[${assCleanup ? 'finalv' : videoLabel}]`,
+    '-c:v', 'libx264', '-preset', 'medium', '-crf', '18',
+    '-pix_fmt', 'yuv420p',
+    '-map', `[${audioMapLabel}]`,
+    '-c:a', 'aac', '-b:a', '192k',
+    '-movflags', '+faststart',
+    tempOutput,
+  ]
+
+  console.log(`  Inputs: ${videoClips.map(p => basename(p)).join(', ')}`)
+  console.log(`  Audio: ${validAudioVoices.filter(Boolean).length} voice(s)` + (bgmPath ? ' + BGM' : ''))
+  console.log(`  Output: ${output}`)
+
+  const r = spawnSync('ffmpeg', args, { stdio: 'pipe', timeout: 300000 })
+  const errStr = r.stderr ? r.stderr.toString() : (r.error ? r.error.message : 'unknown error')
+
+  // Cleanup temp files
+  if (assCleanup) {
+    try { rmSync(assCleanup, { force: true }) } catch {}
+  }
+
+  // Cleanup silence dummies
+  for (let i = N; i < allInputs.length; i++) {
+    const f = allInputs[i]
+    if (f.includes('.silence_tmp_')) {
+      try { rmSync(f, { force: true }) } catch {}
+    }
+  }
+
+  if (r.status === 0) {
+    try {
+      if (existsSync(output)) rmSync(output, { force: true })
+      renameSync(tempOutput, output)
+      const mb = (readFileSync(output).length / 1024 / 1024).toFixed(2)
+      console.log(`  Saved: ${basename(output)} (${mb} MB)`)
+      return true
+    } catch (e) {
+      console.error(`  Failed to rename temp output:`, e.message)
+      return false
+    }
+  } else {
+    try { rmSync(tempOutput, { force: true }) } catch {}
+    const errLines = errStr.split('\n')
+    console.error(`  FFmpeg exit code ${r.status}, last stderr lines:`)
+    console.error(errLines.slice(-15).join('\n'))
+    return false
+  }
+}
+
 export const DEFAULT_BGM = join(moviesDir, 'alex-productions-acoustic-folk-friends.wav')
 
 /**

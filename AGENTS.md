@@ -178,6 +178,9 @@ lib.makeMovie(
 |------|------|
 | `burnVideo(scriptUrl, genDir)` | 按约定路径烧录字幕 + 音频 → `_burn_{h\|v}.mp4`（不含背景音乐） |
 | `renderVideo(opts)` | 核心渲染：scale+pad + ASS 卡拉OK 字幕 + 混音 |
+| `mergeVideoWithTransitions(opts)` | 合并多个 clip 并支持 `xfade` 过渡：直接接受原始素材（`.webm` + `.mp3` + `.subtitle`），统一过渡→烧字幕→混音 |
+| `resolveTransitions(mergeCfg, clipCount, clipDurations)` | 从 `merge.json` 解析过渡配置，返回 `[{type, duration, from, to}]` |
+| `buildTransitionFilter(transitions, targetW, targetH, fps, clipDurations, N)` | 构建 ffmpeg `xfade` filter graph 字符串（含 scale+pad + 音频短淡变） |
 
 #### 辅助/常量
 
