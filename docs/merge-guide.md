@@ -34,20 +34,19 @@ node mergeVideo.mjs e5 -v -f
    │     → [m0.mjs, m1.mjs, m2.mjs]
    │
    ├─ [2] 对每个 .mjs 执行 burn.mjs（透传 CLI 参数）
-   │     → 产生 gen/m0_h.webm + m0.mp3 + m0.subtitle
-   │       gen/m1_v.webm + m1.mp3 + m1.subtitle
+   │     → 产生 gen/m0_burn_h.mp4, m0_burn_v.mp4（自包含：视频+音频+字幕）
    │
-   ├─ [3] 收集原始素材（按方向分组）
-   │     横屏: [m0_h.webm, m2_h.webm] + 对应 .mp3
-   │     竖屏: [m1_v.webm] + 对应 .mp3
+   ├─ [3] 收集 burned 视频（_burn_.mp4，按方向分组）
+   │     横屏: [m0_burn_h.mp4, m2_burn_h.mp4]
+   │     竖屏: [m1_burn_v.mp4]
    │
    ├─ [4] cover 预处理 → 自动检测封面
    │
    ├─ [5] 读 merge.json（可选），取 audioBg / transitions
    │
    ├─ [6] 合并（按方向分别处理）
-   │     ├─ 无 transitions → concat（简单拼接）
-   │     └─ 有 transitions → xfade（过渡动画）+ 统一烧录字幕 + 混音
+   │     ├─ 无 transitions → concatBurnedClips（简单拼接）
+   │     └─ 有 transitions → mergeBurnedWithTransitions（tpad + xfade，视频总长不变）
    │
    ├─ [7] 生成合并字幕 merged.subtitle（备查）
    │
@@ -56,9 +55,9 @@ node mergeVideo.mjs e5 -v -f
 
 ### 素材收集规则
 
-Merge 优先使用**原始素材**（`.webm` + `.mp3`），而非已烧录的 `_burn.mp4`。这是因为过渡动画需要在未烧字幕的原始画面上操作，避免过渡期间字幕重叠。
+Merge 统一使用 **burned 视频**（`_burn_.mp4`），每个文件自包含视频+音频+已烘焙字幕。不使用 raw `.webm` 或独立 `.mp3`。
 
-如果原始 `.webm` 不存在，自动回退到 `_burn.mp4`（此时无法使用过渡）。
+burned 视频由 step 2 的 `burn.mjs` 自动生成，不存在时会报错。
 
 ---
 
@@ -164,20 +163,20 @@ Merge 优先使用**原始素材**（`.webm` + `.mp3`），而非已烧录的 `_
 
 ### 3.3 过渡对时长的影响
 
-每个过渡会**减少**总时长（因为过渡期间两段视频重叠播放）：
+过渡采用 **tpad 补偿机制**，视频总时长不变：
 
 ```
-clip A 10s + clip B 10s + 0.5s fade = 19.5s
-                                      ↑ 减少 0.5s
+clip A 10s + clip B 10s + 0.5s fade
+  → A 末尾延长 0.5s（freeze 最后一帧）
+  → xfade 叠 0.5s
+  → 总时长 = (10 + 0.5) + 10 - 0.5 = 20s  ← 不变
 ```
 
-没有内容被裁剪，只是尾部与头部重叠。音频人声（TTS）不受影响 — 音频只做 0.1s 极短淡变防止咔哒声，不重叠。
+tpad 延长的是前一段的最后一帧（静音冻结），不改变音频和字幕。音频来自 burned 视频自带的音轨，原样 concat。
 
 ### 3.4 字幕处理
 
-有过渡时，字幕不在每个 clip 单独烧录，而是在**过渡后的合并视频上统一烧录**。这避免了过渡期间两段字幕叠在一起的问题。
-
-生成的合并字幕文件：`gen/merged.subtitle`（备查）。
+字幕已烘焙在 burned 视频的画面中，merge 不单独处理字幕。tpad freeze 时最后一帧的字幕保持显示，xfade 过渡时两段字幕自然叠化。
 
 ---
 
@@ -220,7 +219,7 @@ node mergeVideo.mjs p1 --tts spark-tts
 
 ### 缓存机制
 
-Merge 自动检查各上游文件（`.webm`、`.mp3`、`.subtitle`、`merge.json`、封面、BGM）的修改时间。如果已生成的 `merged.mp4` 比所有上游文件都新，则跳过合并步骤。
+Merge 自动检查各上游文件（`_burn_.mp4`、`merge.json`、封面、BGM）的修改时间。如果已生成的 `merged.mp4` 比所有上游文件都新，则跳过合并步骤。
 
 使用 `-f` 强制覆盖缓存。
 
@@ -255,12 +254,13 @@ clip A 末尾 ──→ xfade ──→ clip B 开头
 
 ```
 Merge 阶段（mergeVideo.mjs）：
-  输入: .webm × N + .mp3 × N + .subtitle（合并后） + BGM
+  输入: _burn_.mp4 × N（每个自包含视频+音频+字幕）+ BGM
         │
-        ├─ 视频: xfade 过渡 → 无字幕的合并视频
-        ├─ 音频: 短淡变 concat → 合并配音
-        ├─ 字幕: buildAss() → 临时 ASS 文件
-        └─ 混音: amix（合并配音 + BGM）
+        ├─ 视频: [i:v] → tpad(延长) → xfade 链（有 transition 时）
+        │        或 [i:v] → scale+pad → concat（无 transition 时）
+        ├─ 音频: [i:a] → aresample → concat（原样，不修改）
+        ├─ 字幕: 已烘焙在视频画面中，不处理
+        └─ 混音: amix（合并音频 + BGM）
         │
         ↓
   输出: merged.mp4（含字幕 + 配音 + 背景音乐）
@@ -271,8 +271,8 @@ Merge 阶段（mergeVideo.mjs）：
 | 函数 | 位置 | 作用 |
 |------|------|------|
 | `resolveTransitions()` | `lib-common.mjs` | 从 `merge.json` 解析过渡配置 |
-| `buildTransitionFilter()` | `lib-common.mjs` | 构建 ffmpeg xfade filter graph |
-| `mergeVideoWithTransitions()` | `lib-common.mjs` | 合并入口：过渡→字幕→混音 |
+| `concatBurnedClips()` | `mergeVideo.mjs` | 合并 burned 视频（无 transition） |
+| `mergeBurnedWithTransitions()` | `mergeVideo.mjs` | 合并 burned 视频（tpad + xfade，有 transition） |
 
 ---
 
@@ -286,13 +286,12 @@ Merge 阶段（mergeVideo.mjs）：
 
 检查以下几点：
 1. 项目目录下有 `merge.json`，且格式正确（JSON 标准，无注释）
-2. 至少有 2 个同方向的 clip（如 `m0_v.webm` + `m1_v.webm`）
+2. 至少有 2 个同方向的 burned 视频（如 `m0_burn_v.mp4` + `m1_burn_v.mp4`）
 3. 过渡类型名称拼写正确（参考 [支持的类型列表](#31-支持-25-种过渡类型)）
-4. 原始 `.webm` 文件存在（merge 日志会显示使用原始素材还是回退）
 
-### 6.3 过渡时的字幕重叠怎么办？
+### 6.3 过渡时字幕是否会重叠？
 
-文档方案中的"三轨分离"设计已经解决了这个问题：字幕不是在每个 clip 单独烧录的，而是在过渡完成后的合并视频上统一烧录。如果 merge 回退到了 `_burn.mp4` 路线（原始 `.webm` 不存在），则无法避免字幕重叠，请重新生成原始素材。
+字幕已烘焙在 burned 视频的画面中。tpad 冻结前一帧时，该帧的字幕保持显示；xfade 过渡时两段字幕自然叠化后再消失，视觉效果合理。
 
 ### 6.4 过渡时间太长/太短
 

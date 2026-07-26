@@ -179,6 +179,138 @@ function concatBurnedClips(clipPaths, outputPath, bgmPath, targetW, targetH, fps
 }
 
 /**
+ * Merge burned clips with transitions.
+ * 和 concatBurnedClips 完全一样的结构，仅 video 加 tpad+xfade（视频总长不变）。
+ * 音频从 [i:a] 原样 concat，字幕已烘焙不处理。
+ * 无 transition 的情况由 concatBurnedClips 处理，此函数仅处理有 transition 的 burned clips。
+ */
+function mergeBurnedWithTransitions(clipPaths, outputPath, bgmPath, targetW, targetH, fps, coverPng, transitions) {
+  let coverCleanup = null
+  if (coverPng && existsSync(coverPng)) {
+    const coverClip = join(dirname(outputPath), `.cover_tmp_${basename(outputPath)}`)
+    const ok = makeCoverClip(coverPng, coverClip, targetW, targetH, fps)
+    if (ok) {
+      clipPaths = [coverClip, ...clipPaths]
+      coverCleanup = coverClip
+      console.log(`  Cover: ${coverPng} → 1-frame clip prepended`)
+    } else {
+      console.error(`  Cover: FAILED — ${coverPng}`)
+      return false
+    }
+  }
+
+  const n = clipPaths.length
+  const tempOutput = outputPath.replace(/\.\w+$/, '.tmp$&')
+
+  const allHaveAudio = clipPaths.every(c => clipHasAudio(c))
+  const filterParts = []
+
+  // Probe clip durations for transition offset calculation
+  const clipDurations = clipPaths.map(c => {
+    const info = probeVideo(c)
+    return info?.duration || 0
+  })
+
+  // Compute tpad extensions for transition boundaries
+  const vidExtra = new Array(n).fill(0)
+  for (const t of transitions) {
+    vidExtra[t.from] += t.duration
+  }
+  const vidDurations = clipDurations.map((d, i) => d + vidExtra[i])
+
+  // ── Video: scale+pad + tpad each clip ──
+  for (let i = 0; i < n; i++) {
+    const tpad = vidExtra[i] ? `,tpad=stop_mode=clone:stop_duration=${vidExtra[i]}` : ''
+    filterParts.push(
+      `[${i}:v]fps=${fps},scale=${targetW}:${targetH}:force_original_aspect_ratio=decrease,`
+      + `pad=${targetW}:${targetH}:(ow-iw)/2:(oh-ih)/2,setsar=1${tpad}[v${i}]`
+    )
+    if (allHaveAudio) {
+      filterParts.push(`[${i}:a]aresample=48000[a${i}]`)
+    }
+  }
+
+  // ── Video: xfade chain ──
+  let prevLabel = 'v0'
+  let accDuration = vidDurations[0]
+
+  for (let i = 0; i < transitions.length; i++) {
+    const t = transitions[i]
+    const nextClipIdx = i + 1
+    const offset = Math.max(0, accDuration - t.duration)
+    const outLabel = i === transitions.length - 1 ? 'outv' : `x${i + 1}`
+    filterParts.push(
+      `[${prevLabel}][v${nextClipIdx}]xfade=transition=${t.type}:duration=${t.duration}:offset=${offset.toFixed(3)}[${outLabel}]`
+    )
+    prevLabel = outLabel
+    accDuration = accDuration + vidDurations[nextClipIdx] - t.duration
+  }
+
+  // Handle unconsumed clips after xfade chain
+  const consumedByXfade = transitions.length + 1
+  if (n > consumedByXfade) {
+    const remainingLabels = [`[${prevLabel}]`]
+    for (let j = consumedByXfade; j < n; j++) {
+      remainingLabels.push(`[v${j}]`)
+    }
+    const concatN = remainingLabels.length
+    filterParts.push(`${remainingLabels.join('')}concat=n=${concatN}:v=1:a=0[outv]`)
+  }
+
+  // ── Audio: concat with short fades ──
+  if (allHaveAudio) {
+    const audioLabels = clipDurations.map((_, i) => `[a${i}]`).join('')
+    filterParts.push(`${audioLabels}concat=n=${n}:v=0:a=1[outa]`)
+  }
+
+  // Mix background music
+  const bgIdx = n
+  filterParts.push(`[${bgIdx}:a]volume=0.1,aresample=48000[bg]`)
+  filterParts.push(`[outa][bg]amix=inputs=2:duration=first:dropout_transition=2[finala]`)
+
+  const args = [
+    '-y',
+    ...clipPaths.flatMap(f => ['-i', f]),
+    '-i', bgmPath,
+    '-filter_complex', filterParts.join(';'),
+    '-map', '[outv]',
+    '-map', '[finala]',
+    '-c:v', 'libx264', '-preset', 'medium', '-crf', '18',
+    '-pix_fmt', 'yuv420p',
+    '-c:a', 'aac', '-b:a', '192k',
+    '-movflags', '+faststart',
+    tempOutput,
+  ]
+
+  console.log(`  Inputs: ${clipPaths.map(p => basename(p)).join(', ')}`)
+  console.log(`  Audio: ${allHaveAudio ? 'concat clips + ' : ''}BGM`)
+
+  const r = spawnSync('ffmpeg', args, { stdio: 'pipe', timeout: 300000 })
+  const errStr = r.stderr.toString()
+
+  if (r.status === 0) {
+    try {
+      if (existsSync(outputPath)) rmSync(outputPath, { force: true })
+      renameSync(tempOutput, outputPath)
+      const mb = (readFileSync(outputPath).length / 1024 / 1024).toFixed(2)
+      console.log(`  Saved: ${basename(outputPath)} (${mb} MB)`)
+      return true
+    } catch (e) {
+      console.error(`  Failed to rename:`, e.message)
+      return false
+    } finally {
+      if (coverCleanup) try { rmSync(coverCleanup, { force: true }) } catch {}
+    }
+  } else {
+    try { rmSync(tempOutput, { force: true }) } catch {}
+    if (coverCleanup) try { rmSync(coverCleanup, { force: true }) } catch {}
+    console.error(`  FFmpeg exit code ${r.status}`)
+    console.error(errStr.split('\n').slice(-10).join('\n'))
+    return false
+  }
+}
+
+/**
  * Auto-detect project-level cover images.
  * 只检测 _final_{h|v}.png（cover.mjs 预处理后的成品），不回退到原始截图。
  * Returns { h: path|null, v: path|null } for landscape and portrait covers.
@@ -265,46 +397,17 @@ function mergeProject(dirPath) {
     }
   }
 
-  // 4. Collect raw materials (.webm + .mp3 + .subtitle) for transition-capable merge
+  // 4. Collect burned clips
   const genDir = join(absDir, 'gen')
   const baseNames = files.map(f => basename(f, '.mjs'))
-
-  // Collect by orientation
   const clips_h = []
   const clips_v = []
-  const voices_h = []
-  const voices_v = []
   for (const name of baseNames) {
-    const hPath = join(genDir, `${name}_h.webm`)
-    const vPath = join(genDir, `${name}_v.webm`)
-    if (existsSync(hPath) && statSync(hPath).size > 0) {
-      clips_h.push(hPath)
-      voices_h.push(join(genDir, `${name}.mp3`))
-    }
-    if (existsSync(vPath) && statSync(vPath).size > 0) {
-      clips_v.push(vPath)
-      voices_v.push(join(genDir, `${name}.mp3`))
-    }
+    const h = join(genDir, `${name}_burn_h.mp4`)
+    const v = join(genDir, `${name}_burn_v.mp4`)
+    if (existsSync(h) && statSync(h).size > 0) clips_h.push(h)
+    if (existsSync(v) && statSync(v).size > 0) clips_v.push(v)
   }
-
-  // Fallback to burned clips if no raw .webm found
-  const useBurnedFallback_h = clips_h.length === 0 && baseNames.length > 0
-  const useBurnedFallback_v = clips_v.length === 0 && baseNames.length > 0
-
-  if (useBurnedFallback_h || useBurnedFallback_v) {
-    console.log('  No raw .webm clips found, falling back to burned clips')
-    for (const name of baseNames) {
-      if (useBurnedFallback_h) {
-        const h = join(genDir, `${name}_burn_h.mp4`)
-        if (existsSync(h) && statSync(h).size > 0) clips_h.push(h)
-      }
-      if (useBurnedFallback_v) {
-        const v = join(genDir, `${name}_burn_v.mp4`)
-        if (existsSync(v) && statSync(v).size > 0) clips_v.push(v)
-      }
-    }
-  }
-
   if (clips_h.length === 0 && clips_v.length === 0) {
     console.error('No usable clips found')
     process.exit(1)
@@ -342,8 +445,8 @@ function mergeProject(dirPath) {
   const transitions_h = computeTransitions(clips_h)
   const transitions_v = computeTransitions(clips_v)
 
-  // 7. Merge each orientation — use mergeVideoWithTransitions for raw webm, fallback to concatBurnedClips for burned
-  for (const [clips, voices, suffix] of [[clips_h, voices_h, 'h'], [clips_v, voices_v, 'v']]) {
+  // 7. Merge each orientation
+  for (const [clips, suffix] of [[clips_h, 'h'], [clips_v, 'v']]) {
     if (clips.length === 0) continue
     const mergedPath = join(genDir, `merged_${suffix}.mp4`)
 
@@ -363,46 +466,24 @@ function mergeProject(dirPath) {
       }
     }
 
-    const isUsingRawWebm = !clips[0].includes('_burn_')
-    const useBurned = useBurnedFallback_h || useBurnedFallback_v
-
-    if (isUsingRawWebm && !useBurned) {
-      // ── New path: mergeVideoWithTransitions (supports transitions) ──
-      const info = probeVideo(clips[0])
-      if (!info) {
-        console.error(`Cannot probe clip: ${clips[0]}`)
-        process.exit(1)
-      }
-      const oriTransitions = suffix === 'h' ? transitions_h : transitions_v
-      console.log(`\n=== Merging ${suffix === 'h' ? 'horizontal' : 'vertical'} (${clips.length} clips, ${info.width}×${info.height}, ${info.fps}fps, ${oriTransitions.length} transition(s)) ===`)
-
-      // Generate merged subtitle
-      const totalDur = clips.reduce((sum, c) => {
-        const probe = probeVideo(c)
-        return sum + (probe?.duration || 0)
-      }, 0)
-      const mergedSubPath = mergeSubtitles(genDir, baseNames, totalDur)
-
-      const ok = mergeVideoWithTransitions({
-        videoClips: clips,
-        audioVoices: voices,
-        subtitlePath: mergedSubPath,
-        output: mergedPath,
-        targetW: info.width,
-        targetH: info.height,
-        fps: info.fps,
-        bgmPath: existsSync(bgmPath) ? bgmPath : null,
-        transitions: oriTransitions.length > 0 ? oriTransitions : undefined,
-        coverPng: covers[suffix] || undefined,
-      })
+    const info = probeVideo(clips[0])
+    if (!info) {
+      console.error(`Cannot probe clip: ${clips[0]}`)
+      process.exit(1)
+    }
+    const oriTransitions = suffix === 'h' ? transitions_h : transitions_v
+    if (oriTransitions.length > 0) {
+      console.log(`\n=== Merging ${suffix === 'h' ? 'horizontal' : 'vertical'} (${clips.length} burned clips, ${info.width}×${info.height}, ${info.fps}fps, ${oriTransitions.length} transition(s)) ===`)
+      const ok = mergeBurnedWithTransitions(
+        clips,
+        mergedPath,
+        bgmPath,
+        info.width, info.height, info.fps,
+        covers[suffix] || null,
+        oriTransitions,
+      )
       if (!ok) process.exit(1)
     } else {
-      // ── Fallback: original concatBurnedClips (no transitions) ──
-      const info = probeVideo(clips[0])
-      if (!info) {
-        console.error(`Cannot probe clip: ${clips[0]}`)
-        process.exit(1)
-      }
       console.log(`\n=== Merging ${suffix === 'h' ? 'horizontal' : 'vertical'} (${clips.length} clips, ${info.width}×${info.height}, ${info.fps}fps) ===`)
       const ok = concatBurnedClips(
         clips,
@@ -415,47 +496,7 @@ function mergeProject(dirPath) {
     }
   }
 
-  // 7b. Post-processing: prepend cover to merged videos
-  for (const suffix of ['h', 'v']) {
-    const coverPath = covers[suffix]
-    if (!coverPath) continue
-    const mergedPath = join(genDir, `merged_${suffix}.mp4`)
-    if (!existsSync(mergedPath)) continue
-
-    const info = probeVideo(mergedPath)
-    if (!info) continue
-    const fps = info.fps || 25
-    const coverClip = join(genDir, `.cover_tmp_merged_${suffix}.mp4`)
-    const ok = makeCoverClip(coverPath, coverClip, info.width, info.height, fps)
-    if (!ok) continue
-
-    const tempOutput = mergedPath.replace(/\.\w+$/, '.tmp$&')
-    const rel = (p) => relative(process.cwd(), p).replace(/\\/g, '/')
-    const r = spawnSync('ffmpeg', [
-      '-y',
-      '-i', rel(coverClip),
-      '-i', rel(mergedPath),
-      '-filter_complex',
-      '[0:v]setpts=PTS-STARTPTS[vc];[1:v]setpts=PTS-STARTPTS[vo];[1:a]acopy[ao];' +
-      '[vc][vo]concat=n=2:v=1:a=0[outv]',
-      '-map', '[outv]', '-map', '[ao]',
-      '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '18',
-      '-c:a', 'copy',
-      tempOutput,
-    ], { stdio: 'pipe', timeout: 60000 })
-    if (r.status === 0 && existsSync(tempOutput) && statSync(tempOutput).size > 0) {
-      rmSync(mergedPath, { force: true })
-      renameSync(tempOutput, mergedPath)
-      const mb = Math.round(statSync(mergedPath).size / 1024 / 1024)
-      console.log(`  Cover: prepended to merged_${suffix}.mp4 (${mb} MB)`)
-    } else {
-      try { rmSync(tempOutput, { force: true }) } catch {}
-      console.error(`  Cover: concat FAILED for ${suffix}`)
-    }
-    try { rmSync(coverClip, { force: true }) } catch {}
-  }
-
-  // 8. (备查) Generate merged subtitle from per-clip subtitles
+  // 7. (备查) Generate merged subtitle from per-clip subtitles
   const refClips = clips_h.length > 0 ? clips_h : clips_v
   const totalDur = refClips.reduce((sum, c) => {
     const info = probeVideo(c)
