@@ -67,21 +67,19 @@ Merge 优先使用**原始素材**（`.webm` + `.mp3`），而非已烧录的 `_
 在项目目录下放置 `merge.json`，可选配置。完整示例：
 
 ```jsonc
-// e5/merge.json
 {
   // ── 背景音乐（可选）──
   "audioBg": "Jamvana - Pure Ocean.mp3",
 
-  // ── 全局默认过渡（可选）──
+  // ── 全局默认过渡（可选，所有 clip 之间生效）──
   "transition": {
     "type": "slideleft",
     "duration": 0.5
   },
 
-  // ── 逐条覆盖过渡（可选，优先级高于全局）──
+  // ── 逐条覆盖过渡（可选，仅列出的边界有过渡，其他保持 direct cut）──
   "transitions": [
     { "from": 0, "to": 1, "type": "fade",      "duration": 0.4 },
-    { "from": 1, "to": 2, "type": "zoomin",    "duration": 0.6 },
     { "from": 2, "to": 3, "type": "fadeblack", "duration": 0.3 }
   ]
 }
@@ -92,12 +90,22 @@ Merge 优先使用**原始素材**（`.webm` + `.mp3`），而非已烧录的 `_
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | `audioBg` | string | 背景音乐路径（相对项目目录或绝对路径）。优先级低于 `.env` 的 `AUDIO_BG` |
-| `transition.type` | string | 全局默认过渡类型 |
+| `transition.type` | string | 全局默认过渡类型，存在时所有 clip 边界都应用此过渡 |
 | `transition.duration` | number / string | 全局过渡时长（秒，或百分比如 `"10%"`） |
 | `transitions[].from` | number | 前一个 clip 序号（从 0 开始） |
 | `transitions[].to` | number | 后一个 clip 序号（= from + 1） |
-| `transitions[].type` | string | 过渡类型，覆盖全局 |
+| `transitions[].type` | string | 过渡类型。`"cut"` 表示跳过/直接切换，其余值覆盖全局 |
 | `transitions[].duration` | number / string | 过渡时长，覆盖全局 |
+
+### 语义规则
+
+| 配置方式 | 效果 |
+|----------|------|
+| 不写任何过渡字段 | 全部直接切（cut） |
+| 仅 `transitions[]`（无 `transition`） | **仅列出**的边界有过渡，其他全部直接切 |
+| 仅 `transition`（全局，无 `transitions[]`） | 全部边界都用全局过渡 |
+| `transition` + `transitions[]` | 全部默认全局，列表中的覆盖全局 |
+| `transitions[].type = "cut"` | 显式跳过该边界（即使有全局默认也强制切） |
 
 ### 简化写法
 

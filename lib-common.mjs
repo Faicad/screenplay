@@ -1595,7 +1595,7 @@ const DEFAULT_TRANSITION_DURATION = 0.4
 export function resolveTransitions(mergeCfg, clipCount, clipDurations) {
   const transitions = []
 
-  // Global default
+  // Global default (optional)
   const globalType = mergeCfg?.transition?.type || null
   const globalDuration = mergeCfg?.transition?.duration || null
 
@@ -1604,8 +1604,26 @@ export function resolveTransitions(mergeCfg, clipCount, clipDurations) {
 
   for (let i = 0; i < clipCount - 1; i++) {
     const match = explicit.find(t => t.from === i && t.to === i + 1)
-    let type = match?.type || globalType || 'fade'
-    let duration = parseDuration(match?.duration ?? globalDuration, clipDurations[i], clipDurations[i + 1])
+
+    // type:"cut" → explicitly skip this boundary (no transition)
+    if (match?.type === 'cut') {
+      continue
+    }
+
+    let type, duration
+
+    if (match) {
+      // Explicitly listed boundary → use match values
+      type = match.type || globalType || 'fade'
+      duration = parseDuration(match.duration ?? globalDuration, clipDurations[i], clipDurations[i + 1])
+    } else if (globalType) {
+      // No explicit match but global default exists → use global
+      type = globalType
+      duration = parseDuration(globalDuration, clipDurations[i], clipDurations[i + 1])
+    } else {
+      // Neither explicit nor global → cut (no transition)
+      continue
+    }
 
     if (!XFADE_TYPES.has(type)) {
       console.warn(`  [transition] Unknown type "${type}" at boundary ${i}→${i+1}, falling back to "fade"`)

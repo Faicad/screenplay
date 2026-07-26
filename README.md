@@ -747,21 +747,29 @@ node mergeVideo.mjs p1 -g -f -h       # 1080p + 强制 + 仅横屏
 全局默认过渡（所有 clip 之间生效）：
 
 ```json
-// e5/merge.json
 { "transition": { "type": "slideleft", "duration": 0.5 } }
 ```
 
-逐条覆盖（按 clip 序号）：
+仅指定某一段有过渡（其他保持直接切）：
 
 ```json
 { "transitions": [
-  { "from": 0, "to": 1, "type": "fade",      "duration": 0.4 },
-  { "from": 1, "to": 2, "type": "zoomin",    "duration": 0.6 },
-  { "from": 2, "to": 3, "type": "fadeblack", "duration": 0.3 }
+  { "from": 0, "to": 1, "type": "fade", "duration": 0.4 }
 ] }
 ```
 
-支持 25+ 种过渡类型：`fade`（叠化）、`slideleft/slideright/slideup/slidedown`（滑动）、`zoomin`（放大进入）、`dissolve`（溶解）、`circleclose/circleopen`（圆形展开/收缩）、`wipeleft/wiperight`（擦除）、`pixelize`（像素化）等。
+全局 + 逐条覆盖 + 跳过某段（`type: "cut"`）：
+
+```json
+{
+  "transition": { "type": "fade", "duration": 0.4 },
+  "transitions": [
+    { "from": 1, "to": 2, "type": "cut" }
+  ]
+}
+```
+
+支持 25+ 种过渡类型：`fade`（叠化）、`slideleft/slideright/slideup/slidedown`（滑动）、`zoomin`（放大进入）、`dissolve`（溶解）、`circleclose/circleopen`（圆形展开/收缩）、`wipeleft/wiperight`（擦除）、`pixelize`（像素化）、`cut`（直接切换/无过渡）。
 
 详见 [`docs/merge-guide.md`](./docs/merge-guide.md)。
 
