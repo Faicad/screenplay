@@ -212,7 +212,7 @@ function mergeBurnedWithTransitions(clipPaths, outputPath, bgmPath, targetW, tar
       + `pad=${targetW}:${targetH}:(ow-iw)/2:(oh-ih)/2,setsar=1${tpad}[v${i}]`
     )
     if (allHaveAudio) {
-      filterParts.push(`[${i}:a]aresample=48000[a${i}]`)
+      filterParts.push(`[${i}:a]aresample=48000,apad=whole_dur=${clipDurations[i]}[a${i}]`)
     }
   }
 

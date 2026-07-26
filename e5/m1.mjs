@@ -26,7 +26,7 @@ async function clickFullscreenBtn(page) {
   })
 }
 
-async function scrollDown(page, { speed = 30, duration = 15000 } = {}) {
+async function scrollDown(page, { speed = 30, duration = 13000 } = {}) {
   await page.evaluate(async ({ speed, duration }) => {
     const fs = document.querySelector('.fixed.inset-0.z-50')
     if (!fs) return

@@ -183,7 +183,26 @@ clip A 10s + clip B 10s + 0.5s fade
   → 总时长 = (10 + 0.5) + 10 - 0.5 = 20s  ← 不变
 ```
 
-tpad 延长的是前一段的最后一帧（静音冻结），不改变音频和字幕。音频来自 burned 视频自带的音轨，原样 concat。
+tpad 延长的是前一段的最后一帧（静音冻结），不改变字幕。字幕已烘焙在 burned 视频的画面中，tpad freeze 时最后一帧的字幕保持显示，xfade 过渡时两段字幕自然叠化。
+
+#### 音频的 per-segment 自动补长
+
+音频来自 burned 视频自带的音轨，原样 concat。但每个 burned 片段的音频流和视频流时长可能不一致：
+
+| 情况 | 示例 | 处理方式 |
+|------|------|----------|
+| 视频 > 音频 | m1: 视频 15.12s, 音频 11.57s | 音频补静音到视频长度 |
+| 音频 > 视频 | m4: 视频 42.52s, 音频 45.61s | 音频不动，视频末尾冻结帧补齐 |
+
+在 `mergeBurnedWithTransitions` 中，concat 前对每段音频做 `apad=whole_dur=clipDurations[i]`，其中 `clipDurations[i]` 取 `format.duration = max(视频流时长, 音频流时长)`。**只补不裁**，保证长的那方完整保留：
+
+```
+m0: 音频 11.614s → apad=whole_dur=11.640 → 补 0.026s  ➜  11.640s
+m1: 音频 11.566s → apad=whole_dur=15.120 → 补 3.554s  ➜  15.120s
+m4: 音频 45.612s → apad=whole_dur=45.612 → 已等长     ➜  45.612s
+```
+
+这样音频 concat 的 segment 边界 = `clipDurations` 的累计和，和视频 xfade 的 offset 位置一致，保证每段起始时音画同步。这和 `concatBurnedClips` 中 `concat v=1:a=1` 的 per-segment `max(v, a)` 行为完全一致。
 
 ### 3.4 字幕处理
 

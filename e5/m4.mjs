@@ -11,13 +11,12 @@ const subtitle = `
 界面右侧会自动生成同目录的svg文件的缩略图
 如果缩略图很多, 可以拖动缩略图区域
 把它从一排变成多排
-一次性查看更多内容
 如果要查看成百上千的图片
 --1--
 可以点击右上角的最大化图标
 就可以全屏查看全部的SVG文件了。
 是不是很方便
-关键是这个软件还是开源、免费的
+本软件开源、免费
 --2--
 求关注、求转发、求收藏
 `
@@ -93,23 +92,28 @@ async function widenRightPanel(page, duration = 1200) {
     document.body.appendChild(cursor)
   }, { startX, startY })
 
+  // 平滑拖动（基于 deadline 计时，消除 CDP overhead 累积误差）
+  const deadline = Date.now() + duration
   await page.mouse.move(startX, startY)
   await page.mouse.down()
-
-  // 平滑拖动（linear）
-  const steps = Math.max(Math.floor(duration / 16), 1)
-  for (let i = 1; i <= steps; i++) {
-    const t = i / steps
-    const ease = t                                      // linear
-    const x = startX + (targetX - startX) * ease
+  while (Date.now() < deadline) {
+    const elapsed = deadline - Date.now()
+    const t = Math.max(0, Math.min(1 - elapsed / duration, 1))
+    const x = startX + (targetX - startX) * t
     await page.mouse.move(x, startY)
     // 同步更新浮层光标位置
     await page.evaluate(({ x, y }) => {
       const c = document.getElementById('__movie_cursor')
       if (c) c.style.transform = `translate(${x - 6}px, ${y - 4}px)`
     }, { x, y: startY })
-    await new Promise(r => setTimeout(r, Math.floor(duration / steps)))
+    await new Promise(r => setTimeout(r, 10))
   }
+  // 确保最终位置
+  await page.mouse.move(targetX, startY)
+  await page.evaluate(({ x, y }) => {
+    const c = document.getElementById('__movie_cursor')
+    if (c) c.style.transform = `translate(${x - 6}px, ${y - 4}px)`
+  }, { x: targetX, y: startY })
 
   await page.mouse.up()
 
@@ -383,21 +387,22 @@ async function scrollRightPanel(page, { speed = 30, duration = 2000 } = {}) {
 
 lib.makeMovie(
   import.meta.url,
-  "C:\\git\\3D\\PrusaSlicer\\resources\\icons\\add.svg",
+  "C:\\git\\3D\\OrcaSlicer\\resources\\images\\logo111.svg",
   {
     AutoRotate: '0',
     closeLeftPanel: '1',
     entryDuration: '0',
   },
   async (page, suffix, tPageOpen) => {
-    await zoomSvg(page, 2)
+    await zoomSvg(page, 0.5)
     await lib.contentStart(page)
 
-    await page.waitForTimeout(1000)    
+    await page.waitForTimeout(2000)    
     await ensureRightPanel(page)
-    await scrollRightPanel(page, { speed: 30, duration: 9000 })
+    await scrollRightPanel(page, { speed: 30, duration: 7000 })
+    await page.waitForTimeout(2000)    
 
-    await widenRightPanel(page, 2200)
+    await widenRightPanel(page, 2000)
     await page.waitForTimeout(1000)
     await lib.syncpoint(page)
 
@@ -406,7 +411,7 @@ lib.makeMovie(
     if (found) {
       await highlightBtn(page)
     }
-    await scrollDown(page, { speed: 30, duration: 12000 } )
+    await scrollDown(page, { speed: 30, duration: 10000 } )
     // await lib.screenshot(page, join(__dir, 'capture/m1_end'))
     await lib.captureCover(page)
 
