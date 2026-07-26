@@ -1682,13 +1682,24 @@ export function buildTransitionFilter(transitions, targetW, targetH, fps, clipDu
   const parts = []
   const AUDIO_FADE = 0.1  // short fade to avoid click/pop without voice overlap
 
-  // ── Video: scale+pad each clip (settb normalizes timebase for xfade compat) ──
+  // Extend each clip's video duration at the end (freeze last frame) for each transition
+  // that starts at its boundary, so total video duration matches audio concat duration.
+  const vidExtra = new Array(N).fill(0)
+  for (const t of transitions) {
+    vidExtra[t.from] += t.duration
+  }
+
+  // ── Video: scale+pad each clip, extend with tpad where needed ──
   for (let i = 0; i < N; i++) {
+    const tpad = vidExtra[i] ? `,tpad=stop_mode=clone:stop_duration=${vidExtra[i]}` : ''
     parts.push(
       `[${i}:v]scale=${targetW}:${targetH}:force_original_aspect_ratio=decrease,`
-      + `pad=${targetW}:${targetH}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=${fps},settb=1/${fps}[v${i}]`
+      + `pad=${targetW}:${targetH}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=${fps}${tpad},settb=1/${fps}[v${i}]`
     )
   }
+
+  // Extended clip durations for xfade offset calculation
+  const vidDurations = clipDurations.map((d, i) => d + vidExtra[i])
 
   // ── Video: chain xfade ──
   if (transitions.length === 0) {
@@ -1698,7 +1709,7 @@ export function buildTransitionFilter(transitions, targetW, targetH, fps, clipDu
   } else {
     // Apply xfade sequentially
     let prevLabel = 'v0'
-    let accDuration = clipDurations[0]
+    let accDuration = vidDurations[0]
 
     for (let i = 0; i < transitions.length; i++) {
       const t = transitions[i]
@@ -1711,11 +1722,22 @@ export function buildTransitionFilter(transitions, targetW, targetH, fps, clipDu
         `[${prevLabel}][v${nextClipIdx}]xfade=transition=${t.type}:duration=${t.duration}:offset=${offset.toFixed(3)}[${outLabel}]`
       )
       prevLabel = outLabel
-      accDuration = accDuration + clipDurations[nextClipIdx] - t.duration
+      accDuration = accDuration + vidDurations[nextClipIdx] - t.duration
+    }
+
+    // If some clips are not covered by any transition, concat them after the xfade chain
+    const consumedByXfade = transitions.length + 1
+    if (N > consumedByXfade) {
+      const remainingLabels = [`[${prevLabel}]`]
+      for (let j = consumedByXfade; j < N; j++) {
+        remainingLabels.push(`[v${j}]`)
+      }
+      const concatN = remainingLabels.length
+      parts.push(`${remainingLabels.join('')}concat=n=${concatN}:v=1:a=0[rawv]`)
     }
   }
 
-  // ── Audio: concat with short fades ──
+  // ── Audio: simple concat (duration unchanged by transitions) ──
   for (let i = 0; i < N; i++) {
     const audioInputIdx = N + i  // .mp3 files start at input index N
     const dur = clipDurations[i]
@@ -1738,9 +1760,8 @@ export function buildTransitionFilter(transitions, targetW, targetH, fps, clipDu
   const audioLabels = clipDurations.map((_, i) => `[a${i}]`).join('')
   parts.push(`${audioLabels}concat=n=${N}:v=0:a=1[outa]`)
 
-  // Compute total video duration (with transitions reducing it)
+  // Total video duration = original total (extensions cancel with xfade overlap)
   const totalDuration = clipDurations.reduce((sum, d) => sum + d, 0)
-    - transitions.reduce((sum, t) => sum + t.duration, 0)
 
   return {
     filterComplex: parts.join(';'),

@@ -321,7 +321,22 @@ function buildSceneHtml(scene, marks, index, width, height) {
     if (!isMarkType(step.type)) {
       if (step.type === 'caption') {
         const splitParts = step.split || splitCaptionText(step.text)
-        const style = captionStyle(step, width, height)
+        let style
+        if (step.relativeTo === 'mark' && step.markSelector) {
+          // Position caption relative to a mark (e.g. above a highlighted area)
+          const markStep = { selector: step.markSelector, text: step.markSelector, type: 'caption' }
+          const mark = resolveMark(markStep, marks)
+          if (mark) {
+            const fy = mark.fullY != null ? mark.fullY : mark.y
+            const cx = mark.x + mark.w / 2
+            const offsetY = step.offsetY != null ? step.offsetY : 8
+            const isLandscape = width > height
+            const fontSize = hv(step.fontSize, isLandscape) || 28
+            const color = hv(step.color, isLandscape) || '#ff6b35'
+            style = `position:absolute;left:${cx}px;top:${fy - offsetY}px;transform:translate(-50%,-100%);text-align:center;color:${color};font-size:${fontSize}px;white-space:nowrap`
+          }
+        }
+        if (!style) style = captionStyle(step, width, height)
         if (splitParts.length > 1) {
           // One div, full text as layout anchor. Spans for progressive reveal — layout never shifts.
           let html = `<div class="caption" id="s${index}_c${ai}" style="${style};opacity:0">`
@@ -372,7 +387,8 @@ function buildSceneHtml(scene, marks, index, width, height) {
     if (step.type === 'move-click') {
       const cx = mark.x + mark.w / 2
       const cy = fy + mark.h / 2
-      scrollHtml += `<div class="overlay move-cursor" id="s${index}_cursor${ai}" style="left:${cx}px;top:${cy + 80}px;opacity:0"></div>`
+      const startDist = hv(step.distanceY, width > height) ?? 80
+      scrollHtml += `<div class="overlay move-cursor" id="s${index}_cursor${ai}" style="left:${cx}px;top:${cy + startDist}px;opacity:0"></div>`
     }
     if (step.type === 'highlight-area') {
       const pad = step.padding || 20
@@ -532,7 +548,10 @@ function buildSceneGsap(scene, marks, sceneIndex, sceneStart, sceneDuration, wid
           } else {
             const ms = step.highlightMs || 1500
             chunks.push(`  tl.to('#s${sceneIndex}_area${ai}', {opacity:1,duration:0.3}, ${t.toFixed(3)});`)
-            chunks.push(`  tl.to('#s${sceneIndex}_area${ai}', {opacity:0,duration:0.5}, ${(t + ms / 1000).toFixed(3)});`)
+            // persist: keep highlight visible until end (skip fade-out)
+            if (!step.persist) {
+              chunks.push(`  tl.to('#s${sceneIndex}_area${ai}', {opacity:0,duration:0.5}, ${(t + ms / 1000).toFixed(3)});`)
+            }
           }
         }
         break

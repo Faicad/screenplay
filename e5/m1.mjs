@@ -9,7 +9,7 @@ const subtitle = `
 于是，我决定写一个软件来实现这个功能。
 这就是效果
 可以一次性浏览成百上千个SVG文件
-方便你快速找到自己想要的图标，非常方便
+方便快速找到自己想要的图标，非常方便
 `
 
 async function ensureRightPanel(page) {
@@ -27,7 +27,7 @@ async function clickFullscreenBtn(page) {
   })
 }
 
-async function scrollDown(page, { speed = 30, duration = 6000 } = {}) {
+async function scrollDown(page, { speed = 30, duration = 15000 } = {}) {
   await page.evaluate(async ({ speed, duration }) => {
     const fs = document.querySelector('.fixed.inset-0.z-50')
     if (!fs) return

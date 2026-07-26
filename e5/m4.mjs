@@ -6,7 +6,6 @@ import * as lib from '../lib_3d_viewer_electron.mjs'
 const __dir = dirname(fileURLToPath(import.meta.url))
 
 const subtitle = `
-然后用它打开一个svg文件即可
 界面右侧会自动生成同目录的svg文件的缩略图
 如果缩略图很多
 点击右上角的一个最大化的图标

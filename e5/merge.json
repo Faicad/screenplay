@@ -1,6 +1,6 @@
 {
-  "transition": {
-    "type": "slideleft",
-    "duration": 0.5
-  }
+  "transitions": [
+      { "from": 0, "to": 1, "type": "slideleft", "duration": 0.5 },
+      { "from": 1, "to": 2, "type": "slideleft", "duration": 2.5 }
+  ]
 }

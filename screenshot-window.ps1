@@ -10,24 +10,24 @@ param(
 )
 
 $scriptDir = Split-Path -Parent $PSCommandPath
-$screenshotDir = Join-Path $scriptDir "screenshot"
-if (-not (Test-Path $screenshotDir)) { New-Item -ItemType Directory -Path $screenshotDir -Force | Out-Null }
 
-# Determine base filename (without _h/_v suffix)
+# All output paths are relative to the script directory
 if ($OutputPath) {
-  $extless = [System.IO.Path]::GetFileNameWithoutExtension($OutputPath)
-  $outDir = Split-Path $OutputPath -Parent
-  if (-not $outDir) { $outDir = $screenshotDir }
-  $base = Join-Path $outDir $extless
+  $base = Join-Path $scriptDir $OutputPath
 } elseif ($FileName) {
-  $extless = [System.IO.Path]::GetFileNameWithoutExtension($FileName)
-  $outDir = Split-Path $FileName -Parent
-  if (-not $outDir) { $outDir = $screenshotDir }
-  $base = Join-Path $outDir $extless
+  $base = Join-Path $scriptDir $FileName
 } else {
   $safeName = $WindowTitle -replace '[<>:"/\\|?*]', '_'
-  $base = Join-Path $screenshotDir $safeName
+  $base = Join-Path $scriptDir "screenshot" $safeName
 }
+
+# Strip extension if present (so user can pass "e5/1.png" or "e5/1")
+$ext = [System.IO.Path]::GetExtension($base)
+if ($ext) { $base = [System.IO.Path]::ChangeExtension($base, $null) }
+
+# Ensure output directory exists
+$outDir = Split-Path $base -Parent
+if (-not (Test-Path $outDir)) { New-Item -ItemType Directory -Path $outDir -Force | Out-Null }
 
 # Auto-increment pairs (_h + _v)
 $n = 1
