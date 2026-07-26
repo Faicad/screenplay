@@ -1892,10 +1892,10 @@ ${dialogueLines}
     finalFilter += `;[rawv]ass='${rel(assCleanup)}'[finalv]`
   }
 
-  // Mix BGM if present
+  // Mix BGM if present (volume=0.1 per existing convention in renderVideo)
   let audioMapLabel = audioLabel
   if (bgmPath && clipExists(bgmPath)) {
-    finalFilter += `;[${audioLabel}][${bgmIdx}:a]amix=inputs=2:duration=first:dropout_transition=2[finala]`
+    finalFilter += `;[${bgmIdx}:a]volume=0.1,aresample=48000[bg];[${audioLabel}][bg]amix=inputs=2:duration=first:dropout_transition=2[finala]`
     audioMapLabel = 'finala'
   }
 
