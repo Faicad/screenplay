@@ -6,7 +6,7 @@ import * as lib from '../lib_3d_viewer_electron.mjs'
 const __dir = dirname(fileURLToPath(import.meta.url))
 
 const subtitle = `
-于是我在自己写的3D查看器里实现了这个功能
+于是我在自己写的[[Fai]]((FaiCAD))[[CAD]]查看器里实现了这个功能
 这就是效果
 可以一次性浏览成百上千个SVG文件
 `

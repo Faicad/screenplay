@@ -12,9 +12,9 @@ const frostedCss = `
 renderCover(import.meta.url, {
   // ===== 文案 =====
   texts: {
-    text0: '海量SVG图片',
-    text1: '如何',
-    text2: '快速浏览',
+    text0: '',
+    text1: '海量SVG图片',
+    text2: '如何快速浏览',
   },
 
   // ===== 布局 =====
@@ -22,14 +22,14 @@ renderCover(import.meta.url, {
   // fontSize 不设则 auto（按行宽计算），横屏 auto 时自动减半
   layout: {
     h: {
-      text0: { top: 26, align: 'left',   pad: 22, fontSize: 120 },
-      text1: { top: 26, align: 'right',  pad: 18, fontSize: 120 },
-      text2: { top: 70, align: 'center', pad: 15 },
+      text0: { top: 26, align: 'left',   pad: 22, fontSize: 180 },
+      text1: { top: 26, align: 'center',  pad: 15, fontSize: 200 },
+      text2: { top: 60, align: 'center', pad: 15, fontSize: 120 },
     },
     v: {
       text0: { top: 16, align: 'center', fontSize: 120 },
-      text1: { top: 24, align: 'center', fontSize: 120 },
-      text2: { top: 66, align: 'center' },
+      text1: { top: 24, align: 'center', fontSize: 140 },
+      text2: { top: 50, align: 'center', fontSize: 140 },
     },
   },
 
@@ -37,7 +37,7 @@ renderCover(import.meta.url, {
   // 改这一行即可切换：gold-blue | gold-ruby | rose-teal | amber-violet | coral-navy
   //                    emerald-peach | platinum-slate | neon-cyan | copper-sage | ruby-ice | lavender-mint
   preset: 'gold-ruby',
-  swap: false,  // true → text1/text2 颜色互换
+  swap: true,  // true → text1/text2 颜色互换
 
   // ===== 居中位移 =====
   // center 对齐时 translateY 值，默认 -50%，e5 使用 0（文字顶部对齐定位百分比）

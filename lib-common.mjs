@@ -1360,7 +1360,9 @@ function buildAss(subtitlePath, targetW, targetH) {
   const scaleX = targetW / REF_W
   const scaleY = targetH / REF_H
   // 几何平均：同 preset 下横竖屏字号一致，等比缩放时等价于 scaleX(=scaleY)
-  const scale = Math.sqrt(scaleX * scaleY)
+  let scale = Math.sqrt(scaleX * scaleY)
+  // 竖屏字号增大 50%
+  if (targetH > targetW) scale *= 1.5
 
   const s = (v) => Math.max(1, Math.round(v * scale))
   // ASS karaoke: Primary=已读（黄色高亮填充）, Secondary=未读（白色）
@@ -1846,7 +1848,9 @@ export function mergeVideoWithTransitions(opts) {
         const REF_H = 1080
         const scaleX = targetW / REF_W
         const scaleY = targetH / REF_H
-        const scale = Math.sqrt(scaleX * scaleY)
+        let scale = Math.sqrt(scaleX * scaleY)
+        // 竖屏字号增大 50%
+        if (targetH > targetW) scale *= 1.5
         const s = (v) => Math.max(1, Math.round(v * scale))
 
         const BASE_STYLE = {

@@ -7,8 +7,8 @@ const __dir = dirname(fileURLToPath(import.meta.url))
 
 const subtitle = `
 使用也很简单
-用Faicad 3D查看器打开一个SVG文件
-界面右侧会自动生成同目录的svg文件的缩略图
+用((FaiCAD))3D查看器打开一个SVG文件
+界面右侧会自动生成同目录的SVG文件的缩略图
 如果缩略图很多, 可以拖动缩略图区域
 把它从一排变成多排
 如果要查看成百上千的图片
@@ -394,7 +394,7 @@ lib.makeMovie(
     entryDuration: '0',
   },
   async (page, suffix, tPageOpen) => {
-    await zoomSvg(page, 0.5)
+    await zoomSvg(page, suffix === '_h' ? 0.3 : 0.5)
     await lib.contentStart(page)
 
     await page.waitForTimeout(2000)    
@@ -411,7 +411,7 @@ lib.makeMovie(
     if (found) {
       await highlightBtn(page)
     }
-    await scrollDown(page, { speed: 30, duration: 10000 } )
+    await scrollDown(page, { speed: 30, duration: 9000 } )
     // await lib.screenshot(page, join(__dir, 'capture/m1_end'))
     await lib.captureCover(page)
 
